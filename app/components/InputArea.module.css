@@ -1,0 +1,63 @@
+/* app/components/InputArea.module.css */
+.inputArea {
+    background-color: #ffffff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+}
+  
+.chatInput {
+    flex: 1;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 26px;
+    font-size: 15px;
+    outline: none;
+    margin: 0 10px;
+    background-color: #f1f3f4;
+    color: #3c4043;
+}
+  
+.chatInput:focus {
+    background-color: #e8f0fe;
+}
+  
+.attachButton, .voiceButton {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 10px;
+    color: #5f6368;
+    border-radius: 50%;
+    margin: 0 4px;
+}
+  
+.attachButton:hover, .voiceButton:hover {
+    background-color: #f1f3f4;
+}
+  
+.sendButton {
+    background-color: #1a73e8;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 10px;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+}
+  
+.sendButton:hover {
+    background-color: #1967d2;
+}
+  
+.sendButton:disabled {
+    background-color: #f1f3f4;
+    color: #bdc1c6;
+    cursor: not-allowed;
+}

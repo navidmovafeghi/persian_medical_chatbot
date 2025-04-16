@@ -1,0 +1,100 @@
+/* app/components/ChatContainer.module.css */
+.chatContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+  }
+  
+  .welcomeMessage {
+    margin: auto;
+    text-align: center;
+    max-width: 600px;
+  }
+  
+  .welcomeMessage h1 {
+    font-size: 32px;
+    color: #4a86e8;
+    margin-bottom: 16px;
+  }
+  
+  .welcomeMessage p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+  
+  .suggestionChips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .chip {
+    background-color: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .chip:hover {
+    background-color: #f0f0f5;
+  }
+  
+  .messagesContainer {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .message {
+    max-width: 75%;
+    padding: 12px 18px;
+    border-radius: 18px;
+    margin-bottom: 12px;
+    word-wrap: break-word;
+    line-height: 1.5;
+    direction: rtl;
+    text-align: right;
+    white-space: pre-line;
+  }
+  
+  /* Add styles for markdown elements within messages */
+  .message p {
+    margin-bottom: 8px; /* Add spacing between paragraphs */
+  }
+  
+  .message ul,
+  .message ol {
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-right: 20px; /* Indent lists for RTL */
+  }
+  
+  .message li {
+    margin-bottom: 4px; /* Spacing between list items */
+  }
+  
+  .message strong {
+    font-weight: bold; /* Ensure bold text is visibly bold */
+  }
+  
+  .userMessage {
+    align-self: flex-end;
+    margin-left: auto;
+    background-color: #d1e3ff;
+    color: #1f1f1f;
+  }
+  
+  .botMessage {
+    align-self: flex-start;
+    margin-right: auto;
+    background-color: #f1f3f4;
+    color: #3c4043;
+  }
