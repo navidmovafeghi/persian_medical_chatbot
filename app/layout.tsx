@@ -6,7 +6,7 @@ export const metadata = {
   description: 'چت‌بات پزشکی به زبان فارسی برای پاسخ به سوالات پزشکی',
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fa" dir="rtl">
       <body>{children}</body>
