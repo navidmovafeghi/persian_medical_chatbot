@@ -21,23 +21,6 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-
-  // Check if we're on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    // Initial check
-    checkMobile();
-    
-    // Add listener for window resize
-    window.addEventListener('resize', checkMobile);
-    
-    // Clean up
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Function to handle suggestion chip clicks
   const handleSuggestionClick = (text: string) => {
@@ -76,7 +59,7 @@ export default function Home() {
           const errorData = await response.json();
           console.error(`API Error (Status ${response.status}):`, errorData);
           errorText = errorData.error || JSON.stringify(errorData);
-        } catch (jsonError) {
+        } catch (_) {
           // If JSON parsing fails, try to get the raw text
           try {
             const rawError = await response.text();

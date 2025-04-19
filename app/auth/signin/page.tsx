@@ -40,8 +40,9 @@ export default function SignIn() {
           redirect: true,
           callbackUrl: '/',
         });
-      } catch (error: any) {
-        setError(error.message || 'خطا در ثبت نام');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'خطا در ثبت نام';
+        setError(errorMessage);
         setLoading(false);
       }
     } else {
