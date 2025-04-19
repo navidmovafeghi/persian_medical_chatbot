@@ -1,7 +1,27 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { NextResponse } from 'next/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/db";
 
 const MODEL_NAME = "gemini-1.5-flash"; // Or your preferred model
+
+// Define an interface for the UserProfile type
+interface UserProfile {
+  id: string;
+  userId: string;
+  medicalHistory: string | null;
+  drugHistory: string | null;
+  allergies: string | null;
+  bloodType: string | null;
+  height: number | null;
+  weight: number | null;
+  dateOfBirth: Date | null;
+  gender: string | null;
+  emergencyContact: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -11,11 +31,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Get the user session to identify the user
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.id;
+
     const body = await request.json();
     const userMessage = body.message;
 
     if (!userMessage) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    }
+
+    // Fetch user profile if the user is logged in
+    let userProfile: UserProfile | null = null;
+    if (userId) {
+      userProfile = await prisma.userProfile.findUnique({
+        where: { userId },
+      }) as UserProfile | null;
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -48,9 +80,51 @@ export async function POST(request: Request) {
       },
     ];
 
-    // Consider adding conversation history here for better context
-    // Add system instructions for Persian context
-    const systemInstruction = "شما یک ربات چت پزشکی مفید هستید که به زبان فارسی پاسخ می دهید."; // "You are a helpful medical chatbot that responds in Persian."
+    // Create a system instruction including user profile data if available
+    let systemInstruction = "شما یک ربات چت پزشکی مفید هستید که به زبان فارسی پاسخ می دهید."; // "You are a helpful medical chatbot that responds in Persian."
+    
+    // Add user profile information to the system instruction if available
+    if (userProfile) {
+      systemInstruction += "\n\nاطلاعات پزشکی کاربر:\n";
+      
+      if (userProfile.medicalHistory) {
+        systemInstruction += `سابقه پزشکی: ${userProfile.medicalHistory}\n`;
+      }
+      
+      if (userProfile.drugHistory) {
+        systemInstruction += `داروهای مصرفی: ${userProfile.drugHistory}\n`;
+      }
+      
+      if (userProfile.allergies) {
+        systemInstruction += `حساسیت‌ها: ${userProfile.allergies}\n`;
+      }
+      
+      if (userProfile.bloodType) {
+        systemInstruction += `گروه خونی: ${userProfile.bloodType}\n`;
+      }
+      
+      if (userProfile.gender) {
+        systemInstruction += `جنسیت: ${userProfile.gender}\n`;
+      }
+      
+      if (userProfile.height) {
+        systemInstruction += `قد: ${userProfile.height} سانتی‌متر\n`;
+      }
+      
+      if (userProfile.weight) {
+        systemInstruction += `وزن: ${userProfile.weight} کیلوگرم\n`;
+      }
+      
+      if (userProfile.dateOfBirth) {
+        const birthDate = new Date(userProfile.dateOfBirth);
+        const age = Math.floor((new Date().getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+        systemInstruction += `سن: ${age} سال\n`;
+      }
+      
+      systemInstruction += "\nلطفاً این اطلاعات را در نظر بگیرید و پاسخ‌های خود را بر اساس آن‌ها تنظیم کنید، اما از اشاره مستقیم به این داده‌ها در پاسخ خودداری کنید مگر اینکه مرتبط با سوال باشد.";
+    } else {
+      systemInstruction += "\n\nهیچ اطلاعات پزشکی خاصی برای این کاربر در دسترس نیست.";
+    }
     
     const contents = [
         { 
