@@ -1,54 +1,83 @@
 /* app/page.module.css */
 .container {
-    min-height: 100vh;
+    height: 100vh; /* Force exact viewport height */
     font-family: 'Vazir', 'Tahoma', sans-serif;
+    overflow: hidden; /* Prevent container itself from scrolling */
+    display: flex; /* Use flex to manage vertical layout */
+    flex-direction: column;
+    /* position: relative; */ /* Maybe not needed */
+    padding: 20px 0; /* Apply vertical padding here */
+    box-sizing: border-box; /* Include padding in height */
   }
   
-  .appContainer {
+/* Remove background overlay style */
+/*
+.backgroundOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(rgba(240, 244, 249, 0.85), rgba(240, 244, 249, 0.85)), url('/images/roman-grachev-DC9d8HYI5IQ-unsplash - Copy.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -1; /* Place it behind the content */
+/*}
+*/
+
+.appContainer {
     display: flex;
-    min-height: 100vh;
-    background-color: #f0f4f9; /* Fallback color */
-    /* Previous background image commented out or removed */
-    /* background-image: linear-gradient(rgba(240, 244, 249, 0.85), rgba(240, 244, 249, 0.85)), url('https://img.freepik.com/free-vector/abstract-medical-wallpaper-template-design-healthcare-solution_1017-42418.jpg?w=1380'); */
-    background-image: linear-gradient(rgba(240, 244, 249, 0.85), rgba(240, 244, 249, 0.85)), url('/images/roman-grachev-DC9d8HYI5IQ-unsplash - Copy.jpg'); /* Use local image */
-    background-size: cover; /* Cover the entire area */
-    background-position: center; /* Center the image */
-    background-repeat: no-repeat; /* Do not repeat the image */
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    flex-direction: row; /* Arrange main content and sidebar side-by-side */
+    flex-grow: 1; /* Allow this container to fill space in .container */
+    width: 100%; /* Occupy full width */
+    max-width: 1400px; /* Optional: Limit overall max width */
+    margin: 0 auto; /* Center the container if max-width is set */
+    background-color: transparent; /* Remove background from here */
+    align-items: stretch; /* Reverted: Make children stretch to full height */
+    justify-content: center; /* Center items horizontally */
+    padding: 0 10px; /* Add horizontal padding */
+    gap: 5px; /* Further reduced space */
+    box-sizing: border-box;
+    overflow: hidden; /* Prevent this container from scrolling */
   }
   
   .mainContent {
-    flex: 1;
+    flex: 3; /* Adjusted: 3 parts width */
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    max-width: 800px;
-    width: 100%;
-    height: calc(100vh - 40px);
-    max-height: 90vh;
+    overflow: hidden; /* Keep this */
+    /* max-width: 800px; */ /* Removed to allow flex sizing */
+    /* width: 100%; */ /* Width controlled by flex */
+    /* height: calc(100vh - 40px); */ /* Removed height */
+    /* max-height: 90vh; */ /* Removed max-height */
     background-color: #ffffff;
-    border-radius: 12px;
+    border-radius: 0; /* Removed rounded corners */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     position: relative; /* Needed if clear button positioning is absolute */
+    height: 100%; /* Fill parent height */
+    /* padding: 20px; */ /* Removed padding, handled by grandparent */
+    box-sizing: border-box;
   }
 
   /* Styles for the Clear Chat Button */
   .clearButton {
-    position: absolute; /* Position relative to mainContent */
-    top: 10px;
-    right: 10px; /* Position to the top right */
-    padding: 6px 12px;
+    position: absolute; /* Restored */
+    top: 10px; /* Restored */
+    right: 10px; /* Restored */
+    padding: 6px 12px; /* Restored padding */
     background-color: #e0e0e0; /* Light gray background */
     color: #333; /* Dark text */
     border: none;
-    border-radius: 6px;
+    border-radius: 0; /* Keep rounded corners removed as per previous request */
     cursor: pointer;
-    font-size: 13px;
+    font-size: 13px; /* Restored font size */
     font-family: inherit; /* Use the main font */
-    z-index: 10; /* Ensure it's above other content */
+    z-index: 10; /* Restored */
     transition: background-color 0.2s;
+    /* width: 100%; */ /* Removed */
+    /* margin-bottom: 15px; */ /* Removed */
+    /* text-align: center; */ /* Removed */
   }
 
   .clearButton:hover {
@@ -59,4 +88,62 @@
     background-color: #f5f5f5;
     color: #aaa;
     cursor: not-allowed;
+  }
+
+  /* Right sidebar styles */
+  .rightSidebar {
+    flex: 1; /* Adjusted: 1 part width */
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Restored gap for spacing tiles */
+    overflow-y: auto; /* Keep this */
+    /* height: calc(100vh - 40px); */ /* Removed height */
+    /* max-height: 90vh; */ /* Removed max-height */
+    height: 100%; /* Fill parent height */
+    /* padding: 20px; */ /* Removed padding, handled by grandparent */
+    box-sizing: border-box;
+  }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    .container {
+      padding: 10px 0;
+      height: 100%;
+      min-height: 100vh;
+    }
+
+    .appContainer {
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      padding-top: 50px; /* Make room for hamburger menu */
+    }
+
+    .mainContent {
+      flex: none;
+      width: 100%;
+      height: auto;
+      min-height: 80vh;
+    }
+
+    .rightSidebar {
+      display: none; /* Hide the sidebar on mobile, we'll use the drawer instead */
+    }
+  }
+
+  /* Small mobile responsiveness */
+  @media (max-width: 480px) {
+    .container {
+      padding: 5px 0;
+    }
+
+    .appContainer {
+      padding: 0 5px;
+      padding-top: 50px; /* Make room for hamburger menu */
+    }
+
+    .clearButton {
+      font-size: 12px;
+      padding: 4px 8px;
+    }
   }

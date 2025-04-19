@@ -1,0 +1,123 @@
+/* app/components/Tile.module.css */
+.tile {
+  background-color: #ffffff;
+  border-radius: 0; /* Removed rounded corners */
+  padding: 15px;
+  /* margin-bottom: 15px; */ /* Removed margin, use gap in parent */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  flex-grow: 1; /* Restored: Allow tile to grow and fill space */
+  display: flex; /* Restored: Make tile a flex container */
+  flex-direction: column; /* Restored: Stack content vertically */
+  min-height: 0; /* Add minimum height to prevent sizing issues */
+}
+
+.tile h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.tile p,
+.tile ul {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.tile ul {
+  padding-right: 20px; /* Indent list for Farsi */
+  margin-bottom: 0;
+}
+
+.tile button {
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 0; /* Removed rounded corners */
+  cursor: pointer;
+  font-size: 0.9em;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+}
+
+.tile button:hover {
+  background-color: #0056b3;
+}
+
+/* Style for the Link wrapping the tile */
+.tileLink {
+  text-decoration: none; /* Remove underline */
+  color: inherit; /* Inherit text color */
+  display: block; /* Make the link behave like a block */
+}
+
+/* New styles for the profile tile */
+.tileButton {
+  padding: 8px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 0; /* Square corners */
+  cursor: pointer;
+  font-size: 0.9em;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.tileButton:hover {
+  background-color: #0056b3;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actionLink {
+  display: block;
+  padding: 8px 12px;
+  background-color: #28a745; /* Green */
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 0; /* Square corners */
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+
+.actionLink:hover {
+  background-color: #218838;
+}
+
+/* Styles for frequent questions */
+.questionsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.questionItem {
+  margin-bottom: 8px;
+}
+
+.questionButton {
+  width: 100%;
+  text-align: right;
+  padding: 8px 12px;
+  background-color: #f0f4f8;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 0.9em;
+  margin-top: 0;
+  transition: all 0.2s;
+}
+
+.questionButton:hover {
+  background-color: #e2e8f0;
+  color: #007bff;
+} 

@@ -5,14 +5,7 @@ import { useRef, useEffect } from 'react';
 import styles from './ChatContainer.module.css';
 import ReactMarkdown from 'react-markdown';
 
-export default function ChatContainer({ messages }) {
-  const suggestionChips = [
-    "علائم کرونا چیست؟",
-    "چگونه فشار خون را کنترل کنم؟",
-    "مقدار مصرف داروی استامینوفن",
-    "توصیه برای سردرد میگرنی"
-  ];
-
+export default function ChatContainer({ messages, isLoading }) {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -23,30 +16,13 @@ export default function ChatContainer({ messages }) {
     scrollToBottom();
   }, [messages]);
 
-  const handleChipClick = (text) => {
-    // This would be implemented to interact with the parent component
-    console.log("Selected suggestion:", text);
-    // You could use a callback passed from the parent or context API
-  };
-
   return (
     <div className={styles.chatContainer}>
       {messages.length === 0 ? (
         <div className={styles.welcomeMessage}>
           <h1>سلام، به چت‌بات پزشکی خوش آمدید</h1>
           <p>چگونه می‌توانم به شما کمک کنم؟</p>
-          
-          <div className={styles.suggestionChips}>
-            {suggestionChips.map((chip, index) => (
-              <button 
-                key={index} 
-                className={styles.chip}
-                onClick={() => handleChipClick(chip)}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
+          <p>می‌توانید از سوالات متداول در سمت راست استفاده کنید یا سوال خود را مستقیماً بپرسید.</p>
         </div>
       ) : (
         <div className={styles.messagesContainer}>

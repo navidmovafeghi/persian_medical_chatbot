@@ -2,16 +2,19 @@
 .chatContainer {
     flex: 1;
     overflow-y: auto;
-    padding: 20px;
+    /* padding: 20px; */ /* Remove padding again */
     display: flex;
     flex-direction: column;
     background-color: #ffffff;
+    margin-top: 45px; /* Add margin to push down below button */
+    padding: 10px;
   }
   
   .welcomeMessage {
     margin: auto;
     text-align: center;
     max-width: 600px;
+    padding: 10px;
   }
   
   .welcomeMessage h1 {
@@ -36,7 +39,7 @@
   .chip {
     background-color: white;
     border: 1px solid #e0e0e0;
-    border-radius: 16px;
+    border-radius: 0;
     padding: 8px 16px;
     font-size: 14px;
     cursor: pointer;
@@ -51,12 +54,13 @@
     width: 100%;
     max-width: 800px;
     margin: 0 auto;
+    padding: 0 10px;
   }
   
   .message {
     max-width: 75%;
     padding: 12px 18px;
-    border-radius: 18px;
+    border-radius: 0;
     margin-bottom: 12px;
     word-wrap: break-word;
     line-height: 1.5;
@@ -97,4 +101,48 @@
     margin-right: auto;
     background-color: #f1f3f4;
     color: #3c4043;
+  }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    .welcomeMessage h1 {
+      font-size: 24px;
+    }
+
+    .welcomeMessage p {
+      font-size: 16px;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 10px 14px;
+    }
+  }
+
+  /* Small mobile screens */
+  @media (max-width: 480px) {
+    .chatContainer {
+      margin-top: 35px;
+      padding: 5px;
+    }
+
+    .welcomeMessage {
+      padding: 5px;
+    }
+
+    .welcomeMessage h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .welcomeMessage p {
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    .message {
+      max-width: 90%;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+    }
   }

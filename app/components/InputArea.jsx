@@ -13,9 +13,9 @@ export default function InputArea({ value, onChange, onSubmit, disabled }) {
 
   return (
     <div className={styles.inputArea}>
-      <button type="button" className={styles.attachButton} disabled={disabled}>
+      {/* <button type="button" className={styles.attachButton} disabled={disabled}>
         📎
-      </button>
+      </button> */}
       <input
         type="text"
         className={styles.chatInput}
@@ -31,11 +31,9 @@ export default function InputArea({ value, onChange, onSubmit, disabled }) {
         onClick={onSubmit}
         disabled={!value.trim() || disabled}
       >
-        ➤
+        &#10148; 
       </button>
-      <button type="button" className={styles.voiceButton} disabled={disabled}>
-        🎤
-      </button>
+      {/* Voice button removed */}
     </div>
   );
 }
