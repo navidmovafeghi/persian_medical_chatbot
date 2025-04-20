@@ -6,6 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "prebuild": "node scripts/build-netlify.js",
+    "setup-db": "node scripts/build-netlify.js",
     "start": "next start",
     "lint": "next lint"
   },

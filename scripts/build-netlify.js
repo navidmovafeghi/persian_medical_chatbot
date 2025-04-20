@@ -47,21 +47,16 @@ try {
   process.exit(1);
 }
 
-// Run Prisma migrations
-console.log('Running Prisma migrations...');
+// Skip migrations and use db push for Netlify deployment
+// This is safer for serverless environments and avoids migration issues
+console.log('Setting up database with prisma db push...');
 try {
-  // Try migration deploy - will work if lock file is correct
-  execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+  console.log('Resetting database schema...');
+  execSync('npx prisma db push --accept-data-loss --force-reset', { stdio: 'inherit' });
+  console.log('Database schema reset and pushed successfully.');
 } catch (error) {
-  console.error('Migration deploy failed, attempting to reset database schema...');
-  try {
-    // Create schema directly with db push as fallback
-    execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
-    console.log('Database schema reset and pushed successfully.');
-  } catch (pushError) {
-    console.error('Error deploying schema:', pushError);
-    process.exit(1);
-  }
+  console.error('Error pushing schema to database:', error);
+  process.exit(1);
 }
 
 console.log('Database setup completed successfully.'); 

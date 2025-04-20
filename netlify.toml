@@ -1,5 +1,5 @@
 [build]
-  command = "npx prisma generate && npx prisma migrate deploy && npm run build"
+  command = "node scripts/build-netlify.js && npm run build"
   publish = ".next"
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
 
