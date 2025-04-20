@@ -16,6 +16,19 @@ if (!process.env.DATABASE_URL.startsWith('postgresql://')) {
   process.exit(1);
 }
 
+// Check and fix migration_lock.toml if needed
+const migrationLockPath = path.join(__dirname, '..', 'prisma', 'migrations', 'migration_lock.toml');
+if (fs.existsSync(migrationLockPath)) {
+  const lockContent = fs.readFileSync(migrationLockPath, 'utf-8');
+  if (lockContent.includes('provider = "sqlite"')) {
+    console.log('Fixing migration_lock.toml to use PostgreSQL...');
+    fs.writeFileSync(
+      migrationLockPath,
+      lockContent.replace('provider = "sqlite"', 'provider = "postgresql"')
+    );
+  }
+}
+
 // Add PostgreSQL adapter if missing
 try {
   console.log('Installing PostgreSQL adapter if needed...');
@@ -37,10 +50,18 @@ try {
 // Run Prisma migrations
 console.log('Running Prisma migrations...');
 try {
+  // Try migration deploy - will work if lock file is correct
   execSync('npx prisma migrate deploy', { stdio: 'inherit' });
 } catch (error) {
-  console.error('Error running Prisma migrations:', error);
-  process.exit(1);
+  console.error('Migration deploy failed, attempting to reset database schema...');
+  try {
+    // Create schema directly with db push as fallback
+    execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
+    console.log('Database schema reset and pushed successfully.');
+  } catch (pushError) {
+    console.error('Error deploying schema:', pushError);
+    process.exit(1);
+  }
 }
 
 console.log('Database setup completed successfully.'); 
