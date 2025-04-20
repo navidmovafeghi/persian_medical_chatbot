@@ -17,6 +17,7 @@
     "bcryptjs": "^3.0.2",
     "next": "15.3.0",
     "next-auth": "^4.24.11",
+    "pg": "^8.11.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0"

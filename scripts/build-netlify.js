@@ -2,21 +2,28 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Create directories if they don't exist
-const prismaDir = path.join(__dirname, '..', 'prisma');
-if (!fs.existsSync(prismaDir)) {
-  fs.mkdirSync(prismaDir, { recursive: true });
+// Check for PostgreSQL DATABASE_URL
+if (!process.env.DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL environment variable is not set.');
+  console.error('Please set DATABASE_URL to a valid PostgreSQL connection string.');
+  process.exit(1);
 }
 
-// Ensure the SQLite database file exists
-const dbPath = path.join(prismaDir, 'prod.db');
-if (!fs.existsSync(dbPath)) {
-  console.log('Creating empty SQLite database file...');
-  fs.writeFileSync(dbPath, ''); // Create empty file
+// Make sure the DATABASE_URL is for PostgreSQL
+if (!process.env.DATABASE_URL.startsWith('postgresql://')) {
+  console.error('ERROR: DATABASE_URL must be a PostgreSQL connection string.');
+  console.error('Current DATABASE_URL does not start with postgresql://');
+  process.exit(1);
 }
 
-// Set environment variables for the build
-process.env.DATABASE_URL = `file:./prisma/prod.db`;
+// Add PostgreSQL adapter if missing
+try {
+  console.log('Installing PostgreSQL adapter if needed...');
+  execSync('npm install pg --save', { stdio: 'inherit' });
+} catch (error) {
+  console.warn('Warning: Could not install pg package:', error.message);
+  // Continue anyway as it might already be installed
+}
 
 // Generate Prisma client
 console.log('Generating Prisma client...');
