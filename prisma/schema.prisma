@@ -9,10 +9,10 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
-// PostgreSQL for production on Netlify
+// SQLite for local development
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // NextAuth.js Models
@@ -53,6 +53,9 @@ model User {
   accounts      Account[]
   sessions      Session[]
   userProfile   UserProfile?  // One-to-one relation with our custom UserProfile model
+  chatMessages  ChatMessage[] // One-to-many relation with ChatMessage model
+  appointments  Appointment[] // One-to-many relation with Appointment model
+  laboratoryData LaboratoryData[] // One-to-many relation with LaboratoryData model
 }
 
 model VerificationToken {
@@ -79,4 +82,69 @@ model UserProfile {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Chat message model to store chat history
+model ChatMessage {
+  id        String   @id @default(cuid())
+  text      String   // Message content
+  sender    String   // 'user' or 'bot'
+  userId    String?  // Optional: can be null for anonymous users
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String  // To group messages into conversations
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([conversationId])
+}
+
+// Appointment model for doctor appointments
+model Appointment {
+  id            String   @id @default(cuid())
+  title         String   // Title/purpose of the appointment
+  doctorName    String   // Name of the doctor
+  speciality    String?  // Doctor's speciality (optional)
+  location      String?  // Location of the appointment (optional)
+  notes         String?  // Additional notes
+  dateTime      DateTime // Date and time of the appointment
+  duration      Int      // Duration in minutes
+  reminderSent  Boolean  @default(false) // Whether a reminder has been sent
+  reminded      DateTime? // When the reminder was sent
+  
+  // Reminder settings
+  remindBefore  Int      @default(24) // Hours before appointment to send reminder
+  
+  // Status: 'scheduled', 'completed', 'cancelled', 'missed'
+  status        String   @default("scheduled")
+  
+  // Link to user
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([dateTime])
+}
+
+// Laboratory data model to store test results
+model LaboratoryData {
+  id          String   @id @default(cuid())
+  userId      String
+  testName    String   // Name of the test
+  testDate    DateTime // Date when the test was conducted
+  result      String   // Test result value
+  unit        String?  // Unit of measurement
+  normalRange String?  // Normal range for the test
+  notes       String?  // Additional notes or observations
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Link to user
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([testDate])
 }

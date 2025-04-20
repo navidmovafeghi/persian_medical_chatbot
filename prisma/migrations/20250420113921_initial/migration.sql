@@ -47,9 +47,27 @@ CREATE TABLE "UserProfile" (
     "userId" TEXT NOT NULL,
     "medicalHistory" TEXT,
     "drugHistory" TEXT,
+    "allergies" TEXT,
+    "bloodType" TEXT,
+    "height" REAL,
+    "weight" REAL,
+    "dateOfBirth" DATETIME,
+    "gender" TEXT,
+    "emergencyContact" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "UserProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ChatMessage" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "text" TEXT NOT NULL,
+    "sender" TEXT NOT NULL,
+    "userId" TEXT,
+    "conversationId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ChatMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -69,3 +87,9 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 
 -- CreateIndex
 CREATE UNIQUE INDEX "UserProfile_userId_key" ON "UserProfile"("userId");
+
+-- CreateIndex
+CREATE INDEX "ChatMessage_userId_idx" ON "ChatMessage"("userId");
+
+-- CreateIndex
+CREATE INDEX "ChatMessage_conversationId_idx" ON "ChatMessage"("conversationId");

@@ -31,6 +31,58 @@
   color: #666;
 }
 
+/* Appointment button styles */
+.appointmentsButtonContainer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.appointmentsButton {
+  background-color: #2563eb;
+  color: white;
+  text-decoration: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 1.1rem;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: 100%;
+  max-width: 400px;
+}
+
+.appointmentsButton:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.appointmentLinkContainer {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+}
+
+.appointmentLink {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: inline-block;
+}
+
+.appointmentLink:hover {
+  background-color: #2563eb;
+  color: white;
+}
+
 .formSection {
   margin: 2rem 0;
 }
@@ -155,5 +207,154 @@
   .formRow {
     flex-direction: column;
     gap: 0;
+  }
+}
+
+/* Laboratory data section styles */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.addButton {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover {
+  background-color: #3e8e41;
+}
+
+.labForm {
+  background-color: #f0f8ff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid #d1e3fa;
+}
+
+.cancelButton {
+  background-color: #f1f1f1;
+  color: #333;
+  border: 1px solid #ddd;
+  padding: 0.75rem 1.5rem;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background-color: #e1e1e1;
+}
+
+.labDataContainer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.labDataCard {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #eee;
+}
+
+.labDataHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+
+.labDataHeader h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #2563eb;
+}
+
+.deleteButton {
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background-color 0.2s;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background-color: #ff1f1f;
+}
+
+.deleteButton:disabled {
+  background-color: #ffb8b8;
+  cursor: not-allowed;
+}
+
+.labDataDetails {
+  font-size: 0.95rem;
+}
+
+.labDataDetails p {
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: baseline;
+}
+
+.labDataDetails span {
+  font-weight: bold;
+  margin-left: 0.5rem;
+  color: #666;
+}
+
+.labDate, .labResult, .labNormalRange, .labNotes {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.unit {
+  color: #888;
+  font-size: 0.85rem;
+  margin-right: 0.3rem;
+}
+
+.noDataMessage {
+  text-align: center;
+  color: #888;
+  padding: 2rem 0;
+  font-style: italic;
+}
+
+@media (min-width: 600px) {
+  .labDataContainer {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .sectionHeader button {
+    width: 100%;
   }
 } 

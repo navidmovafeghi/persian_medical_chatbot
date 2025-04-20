@@ -96,6 +96,20 @@
     overflow-y: auto;
     height: 100%;
     box-sizing: border-box;
+    width: 320px;
+    padding: 1rem;
+    background-color: #f0f4f8;
+    display: none; /* Hide by default on mobile */
+}
+
+/* Left sidebar for conversation history */
+.leftSidebar {
+    width: 280px;
+    padding: 1rem;
+    background-color: #f0f4f8;
+    overflow-y: auto;
+    display: none; /* Hide by default on mobile */
+    border-left: 1px solid #e0e7ff;
 }
 
 /* Mobile responsiveness */
@@ -142,5 +156,25 @@
     .clearButton {
         font-size: 12px;
         padding: 6px 12px;
+    }
+}
+
+/* Media query for larger screens */
+@media (min-width: 768px) {
+    .rightSidebar {
+        display: block;
+    }
+}
+
+@media (min-width: 1024px) {
+    .leftSidebar {
+        display: block;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1023px) {
+    .mainContent {
+        padding: 0 0.5rem;
     }
 }

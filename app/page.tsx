@@ -10,17 +10,89 @@ import FrequentQuestionsTile from './components/FrequentQuestionsTile';
 import SubscriptionTile from './components/SubscriptionTile';
 import UserProfileTile from './components/UserProfileTile';
 import MobileMenu from './components/MobileMenu';
+import ConversationList from './components/ConversationList';
+import { useSession } from 'next-auth/react';
 
 // Define the type for a message
 interface Message {
   text: string;
   sender: string;
+  id?: string;
+  createdAt?: Date;
+}
+
+// Define the type for a conversation
+interface Conversation {
+  conversationId: string;
+  createdAt: Date;
 }
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+
+  // Fetch conversations when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchConversations();
+    }
+  }, [isAuthenticated]);
+
+  // Fetch conversation history when activeConversationId changes
+  useEffect(() => {
+    if (activeConversationId && isAuthenticated) {
+      fetchConversationMessages(activeConversationId);
+    } else {
+      // Clear messages if no active conversation
+      setMessages([]);
+    }
+  }, [activeConversationId, isAuthenticated]);
+
+  // Function to fetch user's conversations
+  const fetchConversations = async () => {
+    try {
+      const response = await fetch('/api/chat');
+      if (!response.ok) {
+        console.error('Failed to fetch conversations');
+        return;
+      }
+      const data = await response.json();
+      setConversations(data.conversations || []);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    }
+  };
+
+  // Function to fetch messages for a specific conversation
+  const fetchConversationMessages = async (conversationId: string) => {
+    try {
+      const response = await fetch(`/api/chat?conversationId=${conversationId}`);
+      if (!response.ok) {
+        console.error('Failed to fetch conversation messages');
+        return;
+      }
+      const data = await response.json();
+      setMessages(data.messages || []);
+    } catch (error) {
+      console.error('Error fetching conversation messages:', error);
+    }
+  };
+
+  // Function to handle creating a new conversation
+  const handleNewConversation = () => {
+    setActiveConversationId(null);
+    setMessages([]);
+  };
+
+  // Function to handle selecting a conversation
+  const handleSelectConversation = (conversationId: string) => {
+    setActiveConversationId(conversationId);
+  };
 
   // Function to handle suggestion chip clicks
   const handleSuggestionClick = (text: string) => {
@@ -49,7 +121,10 @@ export default function Home() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ 
+          message,
+          conversationId: activeConversationId // Include current conversation ID if it exists
+        }),
       });
 
       if (!response.ok) {
@@ -85,6 +160,15 @@ export default function Home() {
       // Replace the loading message with the actual bot response
       setMessages(prev => [...prev.slice(0, -1), botResponse]);
 
+      // Update the active conversation ID if this is a new conversation
+      if (!activeConversationId && data.conversationId) {
+        setActiveConversationId(data.conversationId);
+        // Refresh conversations list
+        if (isAuthenticated) {
+          fetchConversations();
+        }
+      }
+
     } catch (error) {
       console.error("Fetch Error:", error);
       const errorMessage: Message = {
@@ -110,6 +194,18 @@ export default function Home() {
       <MobileMenu onQuestionClick={handleSuggestionClick} />
 
       <div className={styles.appContainer}>
+        {/* Left Sidebar - Conversation history (only for logged in users) */}
+        {isAuthenticated && (
+          <div className={styles.leftSidebar}>
+            <ConversationList 
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onSelectConversation={handleSelectConversation}
+              onNewConversation={handleNewConversation}
+            />
+          </div>
+        )}
+
         {/* Main Chat Area */}
         <div className={styles.mainContent}>
           {/* Add Clear Chat Button Back Here */}

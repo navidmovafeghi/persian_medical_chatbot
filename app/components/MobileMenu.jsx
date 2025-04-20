@@ -4,10 +4,13 @@ import UserProfileTile from './UserProfileTile';
 import SubscriptionTile from './SubscriptionTile';
 import FrequentQuestionsTile from './FrequentQuestionsTile';
 import styles from './MobileMenu.module.css';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import Link from 'next/link';
 
 export default function MobileMenu({ onQuestionClick }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isQuestionsOpen, setIsQuestionsOpen] = useState(false);
+  const { data: session } = useSession();
   
   // Frequent questions data
   const frequentQuestions = [
@@ -62,13 +65,35 @@ export default function MobileMenu({ onQuestionClick }) {
     };
   }, [isOpen, isQuestionsOpen]);
 
+  const toggleMenu = () => {
+    setIsOpen(!isOpen);
+  };
+
+  // Handle sign in click
+  const handleSignIn = (e) => {
+    e.preventDefault();
+    signIn();
+  };
+
+  // Handle sign out click
+  const handleSignOut = (e) => {
+    e.preventDefault();
+    signOut();
+  };
+
+  // Handle question click
+  const handleQuestionClick = (text) => {
+    onQuestionClick(text);
+    setIsOpen(false); // Close menu after clicking
+  };
+
   return (
     <>
       {/* Top Bar with centered button */}
       <div className={styles.topBar}>
         <button 
           className={styles.menuButton}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggleMenu}
           aria-label="منو"
         >
           ☰
@@ -95,7 +120,7 @@ export default function MobileMenu({ onQuestionClick }) {
               <li key={index}>
                 <button 
                   onClick={() => {
-                    onQuestionClick?.(question);
+                    handleQuestionClick(question);
                     setIsQuestionsOpen(false);
                   }}
                 >
@@ -114,23 +139,43 @@ export default function MobileMenu({ onQuestionClick }) {
       
       {/* Overlay for main menu */}
       {isOpen && (
-        <div className={styles.overlay} onClick={() => setIsOpen(false)} />
+        <div className={styles.overlay} onClick={toggleMenu} />
       )}
       
       {/* Menu drawer */}
       <div className={`${styles.menuDrawer} ${isOpen ? styles.open : ''}`}>
         <div className={styles.drawerContent}>
           <h2 className={styles.drawerTitle}>منو</h2>
+          
+          {/* Navigation Links */}
+          <div className={styles.navigationLinks}>
+            <Link href="/" className={styles.navLink} onClick={toggleMenu}>
+              صفحه اصلی
+            </Link>
+            
+            {session && (
+              <>
+                <Link href="/profile" className={styles.navLink} onClick={toggleMenu}>
+                  پروفایل پزشکی
+                </Link>
+                
+                <Link href="/appointments" className={styles.navLink} onClick={toggleMenu}>
+                  قرار ملاقات‌ها
+                </Link>
+              </>
+            )}
+          </div>
+          
           <UserProfileTile />
           <SubscriptionTile />
           <FrequentQuestionsTile onQuestionClick={(question) => {
-            onQuestionClick(question);
+            handleQuestionClick(question);
             setIsOpen(false);
           }} />
           
           <button 
             className={styles.closeButton} 
-            onClick={() => setIsOpen(false)}
+            onClick={toggleMenu}
           >
             بستن
           </button>
