@@ -14,6 +14,24 @@
 
 [functions]
   included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**"]
+  external_node_modules = ["bcryptjs", "@prisma/client", "pg"]
+
+# Redirects and rewrites
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/auth/*"
+  to = "/auth/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
 
 [dev]
   command = "npm run dev"
