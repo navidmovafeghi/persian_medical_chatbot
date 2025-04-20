@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>چت‌بات پزشکی فارسی</title>
+  <style>
+    body {
+      font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #F5F7FA;
+      color: #2A3642;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      padding: 20px;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    p {
+      margin-bottom: 30px;
+    }
+    .loader {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid #106466;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+    // Redirect to the main app after a short delay
+    window.onload = function() {
+      setTimeout(function() {
+        window.location.href = '/';
+      }, 2000);
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>چت‌بات پزشکی فارسی</h1>
+    <p>درحال انتقال به برنامه...</p>
+    <div class="loader"></div>
+  </div>
+</body>
+</html> 
