@@ -15,23 +15,38 @@
 [functions]
   included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**"]
   external_node_modules = ["bcryptjs", "@prisma/client", "pg"]
+  node_bundler = "esbuild"
 
-# Redirects and rewrites
+# Handling _next/static assets
+[[redirects]]
+  from = "/_next/static/*"
+  to = "/_next/static/:splat"
+  status = 200
+
+# Handle API routes first
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
+  to = "/.netlify/functions/next-api/:splat"
   status = 200
 
+# Handle the NextAuth default callback route
+[[redirects]]
+  from = "/api/auth/*"
+  to = "/.netlify/functions/next-api/auth/:splat"
+  status = 200
+
+# Handle auth pages explicitly with Next.js
 [[redirects]]
   from = "/auth/*"
-  to = "/auth/:splat"
+  to = "/.netlify/functions/next-server/auth/:splat"
   status = 200
+  force = true
 
+# Handle any other routes with Next.js
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/.netlify/functions/next-server/:splat"
   status = 200
-  force = false
 
 [dev]
   command = "npm run dev"

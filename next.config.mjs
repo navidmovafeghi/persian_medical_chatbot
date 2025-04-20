@@ -6,7 +6,13 @@ const nextConfig = {
     serverComponentsExternalPackages: ['bcryptjs', '@prisma/client', 'pg'],
   },
   // Add source maps for proper error reporting
-  productionBrowserSourceMaps: true
+  productionBrowserSourceMaps: true,
+  // Ensure entire app is included in serverless functions
+  transpilePackages: ['next-auth', 'jose'],
+  // Support root paths
+  basePath: '',
+  // More detailed error reporting
+  reactStrictMode: true
 }
 
 export default nextConfig 
