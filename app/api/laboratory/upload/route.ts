@@ -1,46 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+// @ts-ignore
+import * as Tesseract from 'tesseract.js';
+// @ts-ignore
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set PDF.js worker path
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Function to extract text from images using Tesseract.js (OCR)
-// Note: In a real implementation, you would need to install and import Tesseract.js
-// and possibly other libraries for PDF parsing
 async function extractTextFromImage(filePath: string): Promise<string> {
-  // In a real implementation, you would use Tesseract.js to extract text
-  // For demo purposes, we're returning mock text
-  return `
-CBC (Complete Blood Count)
-Date: 2023-07-15
-Patient: John Doe
-Doctor: Dr. Smith
-
-Results:
-Hemoglobin (Hgb): 14.5 g/dL (Normal Range: 13.5-17.5 g/dL)
-White Blood Cells (WBC): 7.8 x10^9/L (Normal Range: 4.5-11.0 x10^9/L)
-Platelets: 250 x10^9/L (Normal Range: 150-450 x10^9/L)
-  `;
+  try {
+    const { data: { text } } = await Tesseract.recognize(
+      filePath,
+      'eng+far', // English + Persian language
+      {
+        logger: (m: any) => console.log(m)
+      }
+    );
+    return text;
+  } catch (error) {
+    console.error('Error in OCR processing:', error);
+    throw new Error('Failed to extract text from image');
+  }
 }
 
 // Function to parse PDF
-// Note: In a real implementation, you would need to install and import pdf.js or similar
 async function extractTextFromPDF(filePath: string): Promise<string> {
-  // In a real implementation, you would use a PDF parsing library
-  // For demo purposes, we're returning mock text
-  return `
-CBC (Complete Blood Count)
-Date: 2023-07-15
-Patient: John Doe
-Doctor: Dr. Smith
-
-Results:
-Hemoglobin (Hgb): 14.5 g/dL (Normal Range: 13.5-17.5 g/dL)
-White Blood Cells (WBC): 7.8 x10^9/L (Normal Range: 4.5-11.0 x10^9/L)
-Platelets: 250 x10^9/L (Normal Range: 150-450 x10^9/L)
-  `;
+  try {
+    const data = await readFile(filePath);
+    const loadingTask = pdfjsLib.getDocument({ data });
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    return fullText;
+  } catch (error) {
+    console.error('Error in PDF processing:', error);
+    throw new Error('Failed to extract text from PDF');
+  }
 }
 
 // Function to parse the extracted text to structured data
@@ -86,6 +97,19 @@ function parseLabResults(text: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Ensure that the upload directory exists as the first step
+    try {
+      const uploadDir = join(process.cwd(), 'tmp', 'uploads');
+      await mkdir(uploadDir, { recursive: true });
+      console.log(`Created or confirmed upload directory at: ${uploadDir}`);
+    } catch (dirError) {
+      console.error('Error creating upload directory:', dirError);
+      return NextResponse.json({ 
+        error: 'Failed to create upload directory',
+        details: dirError instanceof Error ? dirError.message : 'Unknown error'
+      }, { status: 500 });
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -99,11 +123,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
     
-    // Create temp directory if it doesn't exist
-    const uploadDir = join(process.cwd(), 'tmp', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
-    
     // Generate a unique filename
+    const uploadDir = join(process.cwd(), 'tmp', 'uploads');
     const filename = `${uuidv4()}-${file.name}`;
     const filePath = join(uploadDir, filename);
     
@@ -133,7 +154,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error processing lab result file:', error);
     return NextResponse.json(
-      { error: 'Error processing lab result file' },
+      { 
+        error: 'Error processing lab result file',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

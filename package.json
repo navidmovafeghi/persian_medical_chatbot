@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/init-app.js || scripts\\init-app.bat",
     "dev": "next dev --turbopack",
+    "prebuild": "node scripts/build-netlify.js && (node scripts/init-app.js || scripts\\init-app.bat)",
     "build": "next build",
-    "prebuild": "node scripts/build-netlify.js",
-    "setup-db": "node scripts/build-netlify.js",
+    "prestart": "node scripts/init-app.js || scripts\\init-app.bat",
     "start": "next start",
+    "setup-db": "node scripts/build-netlify.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -19,13 +21,13 @@
     "bcryptjs": "^3.0.2",
     "next": "15.3.0",
     "next-auth": "^4.24.11",
+    "pdfjs-dist": "^4.10.38",
     "pg": "^8.11.3",
-    "pdfjs-dist": "^4.2.28",
     "prisma": "^6.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
-    "tesseract.js": "^5.0.5",
+    "tesseract.js": "^5.1.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
