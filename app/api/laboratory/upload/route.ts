@@ -96,18 +96,58 @@ function parseLabResults(text: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let uploadDir = '';
+  
   try {
-    // Ensure that the upload directory exists as the first step
+    // Ensure that an upload directory exists
     try {
-      const uploadDir = join(process.cwd(), 'tmp', 'uploads');
+      // Get absolute path to the upload directory
+      const cwd = process.cwd();
+      console.log(`Current working directory: ${cwd}`);
+      
+      // First try tmp directory
+      const tmpDir = join(cwd, 'tmp');
+      console.log(`Ensuring tmp directory exists at: ${tmpDir}`);
+      await mkdir(tmpDir, { recursive: true });
+      
+      uploadDir = join(tmpDir, 'uploads');
+      console.log(`Ensuring uploads directory exists at: ${uploadDir}`);
       await mkdir(uploadDir, { recursive: true });
-      console.log(`Created or confirmed upload directory at: ${uploadDir}`);
-    } catch (dirError) {
-      console.error('Error creating upload directory:', dirError);
-      return NextResponse.json({ 
-        error: 'Failed to create upload directory',
-        details: dirError instanceof Error ? dirError.message : 'Unknown error'
-      }, { status: 500 });
+      
+      // Verify directories exist
+      const fs = await import('fs');
+      const uploadExists = fs.existsSync(uploadDir);
+      
+      if (!uploadExists) {
+        throw new Error(`Failed to create or verify upload directory at ${uploadDir}`);
+      }
+      
+      console.log(`Successfully created/verified upload directory at: ${uploadDir}`);
+    } catch (tmpDirError) {
+      console.warn('Failed to use tmp directory, trying public directory fallback:', tmpDirError);
+      
+      try {
+        // Fallback to the public directory which should be writable
+        const publicDir = join(process.cwd(), 'public');
+        const publicUploadsDir = join(publicDir, 'uploads');
+        console.log(`Trying fallback directory at: ${publicUploadsDir}`);
+        
+        await mkdir(publicUploadsDir, { recursive: true });
+        
+        // Verify directory exists
+        const fs = await import('fs');
+        const uploadExists = fs.existsSync(publicUploadsDir);
+        
+        if (!uploadExists) {
+          throw new Error(`Failed to create fallback directory at ${publicUploadsDir}`);
+        }
+        
+        uploadDir = publicUploadsDir;
+        console.log(`Successfully created/verified fallback upload directory at: ${uploadDir}`);
+      } catch (fallbackError: any) {
+        console.error('Error creating fallback directory:', fallbackError);
+        throw new Error(`Failed to create any upload directory: ${fallbackError.message}`);
+      }
     }
 
     const session = await getServerSession(authOptions);
@@ -124,7 +164,6 @@ export async function POST(req: NextRequest) {
     }
     
     // Generate a unique filename
-    const uploadDir = join(process.cwd(), 'tmp', 'uploads');
     const filename = `${uuidv4()}-${file.name}`;
     const filePath = join(uploadDir, filename);
     
@@ -156,7 +195,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Error processing lab result file',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        path: uploadDir || join(process.cwd(), 'tmp', 'uploads'),
+        cwd: process.cwd()
       },
       { status: 500 }
     );
