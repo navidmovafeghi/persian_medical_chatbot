@@ -16,41 +16,89 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 // Function to extract text from images using Tesseract.js (OCR)
 async function extractTextFromImage(filePath: string): Promise<string> {
   try {
+    console.log(`[OCR] Starting OCR on image: ${filePath}`);
+    
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error(`Invalid file path for OCR: ${filePath}`);
+    }
+    
+    // Check if file exists
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File does not exist for OCR: ${filePath}`);
+    }
+    
+    console.log(`[OCR] File verified, starting Tesseract recognition`);
+    
+    // Configure Tesseract worker and logging
     const { data: { text } } = await Tesseract.recognize(
       filePath,
       'eng+far', // English + Persian language
       {
-        logger: (m: any) => console.log(m)
+        logger: (m: any) => {
+          if (m.status === 'recognizing text') {
+            console.log(`[OCR] Recognition progress: ${Math.floor(m.progress * 100)}%`);
+          } else {
+            console.log(`[OCR] Status: ${m.status}`);
+          }
+        }
       }
     );
+    
+    // Log a sample of the extracted text (first 100 chars)
+    const textSample = text.substring(0, 100).replace(/\n/g, ' ');
+    console.log(`[OCR] Extraction complete. Text sample: "${textSample}..."`);
+    
     return text;
   } catch (error) {
-    console.error('Error in OCR processing:', error);
-    throw new Error('Failed to extract text from image');
+    console.error('[OCR] Error in OCR processing:', error);
+    throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 // Function to parse PDF
 async function extractTextFromPDF(filePath: string): Promise<string> {
   try {
+    console.log(`[PDF] Starting PDF extraction on: ${filePath}`);
+    
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error(`Invalid file path for PDF extraction: ${filePath}`);
+    }
+    
+    // Check if file exists
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File does not exist for PDF extraction: ${filePath}`);
+    }
+    
+    console.log(`[PDF] File verified, reading file content`);
     const data = await readFile(filePath);
+    console.log(`[PDF] File read successful, file size: ${data.length} bytes`);
+    
+    console.log(`[PDF] Creating PDF document`);
     const loadingTask = pdfjsLib.getDocument({ data });
     const pdf = await loadingTask.promise;
+    console.log(`[PDF] PDF loaded successfully, pages: ${pdf.numPages}`);
     
     let fullText = '';
     
     // Extract text from each page
     for (let i = 1; i <= pdf.numPages; i++) {
+      console.log(`[PDF] Processing page ${i} of ${pdf.numPages}`);
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items.map((item: any) => item.str).join(' ');
       fullText += pageText + '\n';
     }
     
+    // Log a sample of the extracted text (first 100 chars)
+    const textSample = fullText.substring(0, 100).replace(/\n/g, ' ');
+    console.log(`[PDF] Extraction complete. Text sample: "${textSample}..."`);
+    
     return fullText;
   } catch (error) {
-    console.error('Error in PDF processing:', error);
-    throw new Error('Failed to extract text from PDF');
+    console.error('[PDF] Error in PDF processing:', error);
+    throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -97,21 +145,23 @@ function parseLabResults(text: string) {
 
 export async function POST(req: NextRequest) {
   let uploadDir = '';
+  let processingStage = 'initializing';
   
   try {
     // Ensure that an upload directory exists
     try {
+      processingStage = 'creating_directories';
       // Get absolute path to the upload directory
       const cwd = process.cwd();
-      console.log(`Current working directory: ${cwd}`);
+      console.log(`[LAB_UPLOAD] Current working directory: ${cwd}`);
       
       // First try tmp directory
       const tmpDir = join(cwd, 'tmp');
-      console.log(`Ensuring tmp directory exists at: ${tmpDir}`);
+      console.log(`[LAB_UPLOAD] Ensuring tmp directory exists at: ${tmpDir}`);
       await mkdir(tmpDir, { recursive: true });
       
       uploadDir = join(tmpDir, 'uploads');
-      console.log(`Ensuring uploads directory exists at: ${uploadDir}`);
+      console.log(`[LAB_UPLOAD] Ensuring uploads directory exists at: ${uploadDir}`);
       await mkdir(uploadDir, { recursive: true });
       
       // Verify directories exist
@@ -122,15 +172,15 @@ export async function POST(req: NextRequest) {
         throw new Error(`Failed to create or verify upload directory at ${uploadDir}`);
       }
       
-      console.log(`Successfully created/verified upload directory at: ${uploadDir}`);
-    } catch (tmpDirError) {
-      console.warn('Failed to use tmp directory, trying public directory fallback:', tmpDirError);
+      console.log(`[LAB_UPLOAD] Successfully created/verified upload directory at: ${uploadDir}`);
+    } catch (tmpDirError: any) {
+      console.warn('[LAB_UPLOAD] Failed to use tmp directory, trying public directory fallback:', tmpDirError);
       
       try {
         // Fallback to the public directory which should be writable
         const publicDir = join(process.cwd(), 'public');
         const publicUploadsDir = join(publicDir, 'uploads');
-        console.log(`Trying fallback directory at: ${publicUploadsDir}`);
+        console.log(`[LAB_UPLOAD] Trying fallback directory at: ${publicUploadsDir}`);
         
         await mkdir(publicUploadsDir, { recursive: true });
         
@@ -143,19 +193,21 @@ export async function POST(req: NextRequest) {
         }
         
         uploadDir = publicUploadsDir;
-        console.log(`Successfully created/verified fallback upload directory at: ${uploadDir}`);
+        console.log(`[LAB_UPLOAD] Successfully created/verified fallback upload directory at: ${uploadDir}`);
       } catch (fallbackError: any) {
-        console.error('Error creating fallback directory:', fallbackError);
+        console.error('[LAB_UPLOAD] Error creating fallback directory:', fallbackError);
         throw new Error(`Failed to create any upload directory: ${fallbackError.message}`);
       }
     }
 
+    processingStage = 'auth_check';
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get form data
+    processingStage = 'form_data_extraction';
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
@@ -163,27 +215,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
     
+    console.log(`[LAB_UPLOAD] File received: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    
     // Generate a unique filename
+    processingStage = 'file_saving';
     const filename = `${uuidv4()}-${file.name}`;
     const filePath = join(uploadDir, filename);
+    console.log(`[LAB_UPLOAD] Saving file to: ${filePath}`);
     
     // Convert file to buffer and save to disk
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
+    console.log(`[LAB_UPLOAD] File saved successfully to: ${filePath}`);
+    
+    // Check if file was actually saved
+    const fs = await import('fs');
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File was not saved at ${filePath}`);
+    }
     
     // Extract text based on file type
+    processingStage = 'text_extraction';
     let extractedText = '';
+    console.log(`[LAB_UPLOAD] Processing file of type: ${file.type}`);
+    
     if (file.type === 'application/pdf') {
+      console.log('[LAB_UPLOAD] Starting PDF extraction');
       extractedText = await extractTextFromPDF(filePath);
+      console.log('[LAB_UPLOAD] PDF extraction completed');
     } else if (file.type.startsWith('image/')) {
+      console.log('[LAB_UPLOAD] Starting OCR extraction');
       extractedText = await extractTextFromImage(filePath);
+      console.log('[LAB_UPLOAD] OCR extraction completed');
     } else {
       return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
     }
     
     // Parse the extracted text to structured data
+    processingStage = 'data_parsing';
+    console.log('[LAB_UPLOAD] Parsing extracted text');
     const extractedData = parseLabResults(extractedText);
+    console.log('[LAB_UPLOAD] Parsing complete, returning results');
     
     return NextResponse.json({
       success: true,
@@ -191,11 +264,22 @@ export async function POST(req: NextRequest) {
       extractedData,
     });
   } catch (error) {
-    console.error('Error processing lab result file:', error);
+    console.error(`[LAB_UPLOAD] Error in stage "${processingStage}":`, error);
+    
+    // Try to get a sample of the extracted text if available
+    let errorDetails = '';
+    if (error instanceof Error) {
+      errorDetails = error.message;
+      if (error.stack) {
+        console.error('[LAB_UPLOAD] Error stack:', error.stack);
+      }
+    }
+    
     return NextResponse.json(
       { 
         error: 'Error processing lab result file',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        stage: processingStage,
+        details: errorDetails,
         path: uploadDir || join(process.cwd(), 'tmp', 'uploads'),
         cwd: process.cwd()
       },

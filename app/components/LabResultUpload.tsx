@@ -55,6 +55,8 @@ export default function LabResultUpload({ onDataExtracted, onCancel }: LabResult
     setUploadError(null);
     
     try {
+      console.log(`[CLIENT] Uploading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+      
       const formData = new FormData();
       formData.append('file', file);
       
@@ -66,8 +68,19 @@ export default function LabResultUpload({ onDataExtracted, onCancel }: LabResult
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'خطا در پردازش فایل');
+        console.error('[CLIENT] Upload error response:', data);
+        let errorMessage = data.error || 'خطا در پردازش فایل';
+        
+        // Add detailed error information if available
+        if (data.stage && data.details) {
+          console.error(`[CLIENT] Error in stage "${data.stage}": ${data.details}`);
+          errorMessage = `${errorMessage} - مرحله: ${data.stage} - ${data.details}`;
+        }
+        
+        throw new Error(errorMessage);
       }
+      
+      console.log('[CLIENT] Upload successful, data:', data);
       
       // Set the extracted data for review
       setExtractedData(data.extractedData);
@@ -81,7 +94,7 @@ export default function LabResultUpload({ onDataExtracted, onCancel }: LabResult
       });
       setIsReviewing(true);
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('[CLIENT] Upload error:', error);
       setUploadError(error instanceof Error ? error.message : 'خطا در آپلود فایل');
     } finally {
       setIsUploading(false);
