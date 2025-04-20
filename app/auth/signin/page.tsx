@@ -132,6 +132,14 @@ export default function SignIn() {
           </button>
         </div>
         
+        {!isRegister && (
+          <div className={styles.forgotPassword}>
+            <Link href="/auth/reset-password">
+              رمز عبور خود را فراموش کرده‌اید؟
+            </Link>
+          </div>
+        )}
+        
         <div className={styles.backLink}>
           <Link href="/">بازگشت به صفحه اصلی</Link>
         </div>
