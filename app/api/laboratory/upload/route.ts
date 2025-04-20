@@ -151,49 +151,69 @@ export async function POST(req: NextRequest) {
     // Ensure that an upload directory exists
     try {
       processingStage = 'creating_directories';
-      // Get absolute path to the upload directory
-      const cwd = process.cwd();
-      console.log(`[LAB_UPLOAD] Current working directory: ${cwd}`);
+      // Check if we're in a serverless environment
+      const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || 
+                          process.env.NETLIFY || 
+                          process.env.VERCEL || 
+                          process.cwd().includes('/var/task');
       
-      // First try tmp directory
-      const tmpDir = join(cwd, 'tmp');
-      console.log(`[LAB_UPLOAD] Ensuring tmp directory exists at: ${tmpDir}`);
-      await mkdir(tmpDir, { recursive: true });
+      console.log(`[LAB_UPLOAD] Environment detection: Serverless=${isServerless}, CWD=${process.cwd()}`);
       
-      uploadDir = join(tmpDir, 'uploads');
-      console.log(`[LAB_UPLOAD] Ensuring uploads directory exists at: ${uploadDir}`);
-      await mkdir(uploadDir, { recursive: true });
-      
-      // Verify directories exist
-      const fs = await import('fs');
-      const uploadExists = fs.existsSync(uploadDir);
-      
-      if (!uploadExists) {
-        throw new Error(`Failed to create or verify upload directory at ${uploadDir}`);
+      if (isServerless) {
+        // In serverless environments, only /tmp is writable
+        console.log('[LAB_UPLOAD] Serverless environment detected, using /tmp directory');
+        uploadDir = '/tmp/uploads';
+      } else {
+        // For local development, use paths relative to CWD
+        const cwd = process.cwd();
+        console.log(`[LAB_UPLOAD] Local environment, using relative paths from: ${cwd}`);
+        uploadDir = join(cwd, 'tmp', 'uploads');
       }
       
-      console.log(`[LAB_UPLOAD] Successfully created/verified upload directory at: ${uploadDir}`);
-    } catch (tmpDirError: any) {
-      console.warn('[LAB_UPLOAD] Failed to use tmp directory, trying public directory fallback:', tmpDirError);
+      console.log(`[LAB_UPLOAD] Using upload directory: ${uploadDir}`);
+      
+      // Create the directory if it doesn't exist
+      await mkdir(uploadDir, { recursive: true });
+      
+      // Verify directory exists and is writable
+      const fs = await import('fs');
+      
+      if (!fs.existsSync(uploadDir)) {
+        throw new Error(`Failed to create upload directory at ${uploadDir}`);
+      }
+      
+      // Test write permissions by creating a test file
+      const testFilePath = join(uploadDir, '.write-test');
+      try {
+        await writeFile(testFilePath, 'test');
+        await fs.promises.unlink(testFilePath);
+        console.log(`[LAB_UPLOAD] Directory is writable: ${uploadDir}`);
+      } catch (writeError) {
+        console.error(`[LAB_UPLOAD] Directory is not writable: ${uploadDir}`, writeError);
+        throw new Error(`Directory exists but is not writable: ${uploadDir}`);
+      }
+      
+    } catch (dirError: any) {
+      console.warn('[LAB_UPLOAD] Failed to use primary directory, trying fallback:', dirError);
       
       try {
-        // Fallback to the public directory which should be writable
-        const publicDir = join(process.cwd(), 'public');
-        const publicUploadsDir = join(publicDir, 'uploads');
-        console.log(`[LAB_UPLOAD] Trying fallback directory at: ${publicUploadsDir}`);
+        // Last resort fallback - try /tmp directly if available
+        uploadDir = '/tmp';
+        console.log(`[LAB_UPLOAD] Trying absolute fallback directory at: ${uploadDir}`);
         
-        await mkdir(publicUploadsDir, { recursive: true });
-        
-        // Verify directory exists
+        // Verify directory exists and is writable
         const fs = await import('fs');
-        const uploadExists = fs.existsSync(publicUploadsDir);
         
-        if (!uploadExists) {
-          throw new Error(`Failed to create fallback directory at ${publicUploadsDir}`);
+        // Test write permissions by creating a test file
+        const testFilePath = join(uploadDir, '.write-test');
+        try {
+          await writeFile(testFilePath, 'test');
+          await fs.promises.unlink(testFilePath);
+          console.log(`[LAB_UPLOAD] Fallback directory is writable: ${uploadDir}`);
+        } catch (writeError) {
+          console.error(`[LAB_UPLOAD] Fallback directory is not writable: ${uploadDir}`, writeError);
+          throw new Error(`Cannot find any writable directory for file uploads`);
         }
-        
-        uploadDir = publicUploadsDir;
-        console.log(`[LAB_UPLOAD] Successfully created/verified fallback upload directory at: ${uploadDir}`);
       } catch (fallbackError: any) {
         console.error('[LAB_UPLOAD] Error creating fallback directory:', fallbackError);
         throw new Error(`Failed to create any upload directory: ${fallbackError.message}`);
@@ -258,6 +278,14 @@ export async function POST(req: NextRequest) {
     const extractedData = parseLabResults(extractedText);
     console.log('[LAB_UPLOAD] Parsing complete, returning results');
     
+    // Clean up the uploaded file
+    try {
+      await fs.promises.unlink(filePath);
+      console.log(`[LAB_UPLOAD] Temporary file removed: ${filePath}`);
+    } catch (cleanupError) {
+      console.warn(`[LAB_UPLOAD] Failed to remove temporary file: ${filePath}`, cleanupError);
+    }
+    
     return NextResponse.json({
       success: true,
       extractedText,
@@ -280,8 +308,10 @@ export async function POST(req: NextRequest) {
         error: 'Error processing lab result file',
         stage: processingStage,
         details: errorDetails,
-        path: uploadDir || join(process.cwd(), 'tmp', 'uploads'),
-        cwd: process.cwd()
+        path: uploadDir || '/tmp',
+        cwd: process.cwd(),
+        env: process.env.NODE_ENV,
+        serverless: process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY || process.env.VERCEL || false
       },
       { status: 500 }
     );

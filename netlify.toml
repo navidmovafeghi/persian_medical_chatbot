@@ -8,13 +8,17 @@
 [build.environment]
   NEXT_PUBLIC_BASE_URL = "https://persian-medical-chatbot.netlify.app"
   NEXTAUTH_URL = "https://persian-medical-chatbot.netlify.app"
+  # You'll need to set DATABASE_URL in the Netlify UI environment variables
+  # DATABASE_URL = "postgresql://username:password@endpoint.neon.tech/database?sslmode=require"
   NODE_VERSION = "20"
   NPM_VERSION = "10"
 
 [functions]
-  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**"]
-  external_node_modules = ["bcryptjs", "@prisma/client", "pg"]
+  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**", "node_modules/pdfjs-dist/**", "node_modules/tesseract.js/**"]
+  external_node_modules = ["bcryptjs", "@prisma/client", "pg", "pdfjs-dist", "tesseract.js"]
   node_bundler = "esbuild"
+  # Increase timeouts for OCR operations which can be time-consuming
+  timeout = 60
 
 # Let the Next.js plugin handle all routing by default
 # The plugin will automatically route all requests to the appropriate function
@@ -36,6 +40,13 @@
   from = "/auth/*"
   to = "/auth/:splat"
   status = 200
+
+# Handle laboratory uploads explicitly
+[[redirects]]
+  from = "/api/laboratory/upload"
+  to = "/api/laboratory/upload"
+  status = 200
+  force = true
 
 # The fallback redirect should be simple
 [[redirects]]
