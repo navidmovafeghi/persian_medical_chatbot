@@ -1,98 +1,237 @@
 /* app/components/Tile.module.css */
 .tile {
-  background-color: #ffffff;
-  border-radius: 0; /* Removed rounded corners */
-  padding: 15px;
-  /* margin-bottom: 15px; */ /* Removed margin, use gap in parent */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  flex-grow: 1; /* Restored: Allow tile to grow and fill space */
-  display: flex; /* Restored: Make tile a flex container */
-  flex-direction: column; /* Restored: Stack content vertically */
-  min-height: 0; /* Add minimum height to prevent sizing issues */
+  background-color: var(--card-bg);
+  border-radius: 12px; 
+  padding: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+  transition: transform 0.3s, box-shadow 0.3s;
+  border: 1px solid var(--border-color);
+}
+
+.clickableTile {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.clickableTile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary-light);
+}
+
+.tileDescription {
+  color: var(--foreground);
+  opacity: 0.7;
+  font-size: 0.9em;
+  margin: 8px 0;
+}
+
+.previewQuestions {
+  margin-top: 12px;
+  padding-right: 8px;
+}
+
+.previewQuestion {
+  font-size: 0.9em;
+  color: var(--foreground);
+  opacity: 0.8;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tile h2 {
   margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1em;
-  color: #333;
+  margin-bottom: 12px;
+  font-size: 1.2em;
+  color: var(--foreground);
+  font-weight: bold;
 }
 
 .tile p,
 .tile ul {
-  font-size: 0.9em;
-  color: #555;
+  font-size: 0.95em;
+  color: var(--foreground);
+  opacity: 0.8;
 }
 
 .tile ul {
-  padding-right: 20px; /* Indent list for Farsi */
+  padding-right: 20px;
   margin-bottom: 0;
 }
 
 .tile button {
-  padding: 8px 12px;
-  background-color: #007bff;
+  padding: 10px 16px;
+  background-color: var(--primary);
   color: white;
   border: none;
-  border-radius: 0; /* Removed rounded corners */
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9em;
-  margin-top: 10px;
-  transition: background-color 0.2s;
+  font-size: 0.95em;
+  margin-top: 16px;
+  transition: all 0.3s ease;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
 }
 
 .tile button:hover {
-  background-color: #0056b3;
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* Style for the Link wrapping the tile */
+/* Popup styles */
+.popupOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.popup {
+  background-color: var(--card-bg);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+  border-radius: 12px;
+  animation: slideUp 0.3s ease;
+  border: 1px solid var(--border-color);
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to { 
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.popupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--background);
+}
+
+.popupHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--foreground);
+}
+
+.closePopup {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--foreground);
+  opacity: 0.7;
+  padding: 0;
+  margin: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.closePopup:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: rotate(90deg);
+}
+
+.popupContent {
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(80vh - 70px);
+}
+
+/* Tile Link */
 .tileLink {
-  text-decoration: none; /* Remove underline */
-  color: inherit; /* Inherit text color */
-  display: block; /* Make the link behave like a block */
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
-/* New styles for the profile tile */
+/* Buttons and actions */
 .tileButton {
-  padding: 8px 12px;
-  background-color: #007bff;
+  padding: 10px 16px;
+  background-color: var(--primary);
   color: white;
   border: none;
-  border-radius: 0; /* Square corners */
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9em;
-  margin-top: 10px;
-  transition: background-color 0.2s;
+  font-size: 0.95em;
+  margin-top: 16px;
+  transition: all 0.3s ease;
   width: 100%;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
 }
 
 .tileButton:hover {
-  background-color: #0056b3;
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 }
 
 .actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .actionLink {
   display: block;
-  padding: 8px 12px;
-  background-color: #28a745; /* Green */
+  padding: 10px 16px;
+  background-color: var(--secondary);
   color: white;
   text-align: center;
   text-decoration: none;
-  border-radius: 0; /* Square corners */
-  font-size: 0.9em;
-  transition: background-color 0.2s;
+  border-radius: 8px;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
 }
 
 .actionLink:hover {
-  background-color: #218838;
+  background-color: var(--secondary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* Styles for frequent questions */
+/* Frequent questions styles */
 .questionsList {
   list-style: none;
   padding: 0;
@@ -100,24 +239,28 @@
 }
 
 .questionItem {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .questionButton {
   width: 100%;
   text-align: right;
-  padding: 8px 12px;
-  background-color: #f0f4f8;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 0;
+  padding: 12px 16px;
+  background-color: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9em;
+  font-size: 0.95em;
   margin-top: 0;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
 }
 
 .questionButton:hover {
-  background-color: #e2e8f0;
-  color: #007bff;
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 } 

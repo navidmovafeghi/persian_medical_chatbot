@@ -7,13 +7,38 @@ import styles from './MobileMenu.module.css';
 
 export default function MobileMenu({ onQuestionClick }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isQuestionsOpen, setIsQuestionsOpen] = useState(false);
+  
+  // Frequent questions data
+  const frequentQuestions = [
+    "علائم کرونا چیست؟",
+    "چگونه فشار خون را کنترل کنم؟",
+    "مقدار مصرف داروی استامینوفن",
+    "توصیه برای سردرد میگرنی",
+    "علائم آنفولانزا کدامند؟",
+    "نشانه‌های دیابت چیست؟",
+    "چگونه وزن کم کنم؟",
+    "درمان سرماخوردگی در خانه",
+    "علائم کمبود ویتامین D",
+    "داروهای ضد التهاب بدون نسخه",
+    "مشکلات گوارشی در بارداری",
+    "تغذیه مناسب برای کودکان",
+    "راه‌های کاهش استرس و اضطراب",
+    "چگونه خواب بهتری داشته باشم؟"
+  ];
   
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (isOpen && !event.target.closest(`.${styles.menuDrawer}`) && 
-          !event.target.closest(`.${styles.hamburgerIcon}`)) {
+          !event.target.closest(`.${styles.topBar}`)) {
         setIsOpen(false);
+      }
+      
+      if (isQuestionsOpen && 
+          !event.target.closest(`.${styles.questionsMenu}`) && 
+          !event.target.closest(`.${styles.questionsButton}`)) {
+        setIsQuestionsOpen(false);
       }
     };
     
@@ -22,11 +47,11 @@ export default function MobileMenu({ onQuestionClick }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, isQuestionsOpen]);
 
   // Prevent body scrolling when menu is open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || isQuestionsOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -35,22 +60,59 @@ export default function MobileMenu({ onQuestionClick }) {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, isQuestionsOpen]);
 
   return (
     <>
-      {/* Hamburger icon */}
-      <button 
-        className={`${styles.hamburgerIcon} ${isOpen ? styles.open : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label="منو"
-      >
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
+      {/* Top Bar with centered button */}
+      <div className={styles.topBar}>
+        <button 
+          className={styles.menuButton}
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label="منو"
+        >
+          ☰
+        </button>
+      </div>
       
-      {/* Overlay */}
+      {/* Frequent Questions Bar with toggle button */}
+      <div className={styles.questionsBar}>
+        <button 
+          className={styles.questionsButton}
+          onClick={() => setIsQuestionsOpen(!isQuestionsOpen)}
+        >
+          سوالات متداول
+          <span className={isQuestionsOpen ? styles.arrowUp : styles.arrowDown}>▼</span>
+        </button>
+      </div>
+      
+      {/* Collapsible Questions Menu */}
+      <div className={`${styles.questionsMenu} ${isQuestionsOpen ? styles.open : ''}`}>
+        <div className={styles.questionsMenuContent}>
+          <h3>سوالات متداول</h3>
+          <ul>
+            {frequentQuestions.map((question, index) => (
+              <li key={index}>
+                <button 
+                  onClick={() => {
+                    onQuestionClick?.(question);
+                    setIsQuestionsOpen(false);
+                  }}
+                >
+                  {question}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      
+      {/* Overlay for questions menu */}
+      {isQuestionsOpen && (
+        <div className={styles.questionsOverlay} onClick={() => setIsQuestionsOpen(false)} />
+      )}
+      
+      {/* Overlay for main menu */}
       {isOpen && (
         <div className={styles.overlay} onClick={() => setIsOpen(false)} />
       )}

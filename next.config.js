@@ -11,15 +11,15 @@ const nextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
+  // Fix for experimental options
+  experimental: {},
   // Ensure we can use our SQLite database for both development and production
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', 'bcryptjs'],
-  },
+  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
   // If your application needs different configuration for production vs development,
   // you can use the following structure
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || "MRa2IXgBZn7PwSrPG4+cB9/vFwNKrVZPCgdlbcW7rCs="
   },
   // Fix issue with missing Prisma binary for Netlify
   webpack: (config, { isServer }) => {
