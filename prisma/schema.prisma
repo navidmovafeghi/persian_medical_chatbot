@@ -9,9 +9,9 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
-// SQLite for both development and production
+// PostgreSQL for production on Netlify
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
