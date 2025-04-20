@@ -6,11 +6,13 @@ import FrequentQuestionsTile from './FrequentQuestionsTile';
 import styles from './MobileMenu.module.css';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function MobileMenu({ onQuestionClick }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isQuestionsOpen, setIsQuestionsOpen] = useState(false);
   const { data: session } = useSession();
+  const router = useRouter();
   
   // Frequent questions data
   const frequentQuestions = [
@@ -78,7 +80,18 @@ export default function MobileMenu({ onQuestionClick }) {
   // Handle sign out click
   const handleSignOut = (e) => {
     e.preventDefault();
-    signOut();
+    // Explicitly set callbackUrl to ensure redirect works properly on Netlify
+    signOut({ 
+      callbackUrl: '/',
+      redirect: true
+    });
+    
+    // As a fallback, use client-side navigation if the signOut redirect doesn't work
+    setTimeout(() => {
+      setIsOpen(false);
+      router.push('/');
+      router.refresh();
+    }, 500);
   };
 
   // Handle question click

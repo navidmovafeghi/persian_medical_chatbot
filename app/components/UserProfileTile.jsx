@@ -2,13 +2,27 @@
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import styles from './Tile.module.css';
+import { useRouter } from 'next/navigation';
 
 export default function UserProfileTile() {
   const { data: session, status } = useSession();
   const loading = status === 'loading';
+  const router = useRouter();
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' });
+    // Explicitly set callbackUrl to ensure redirect works properly on Netlify
+    await signOut({ 
+      callbackUrl: '/',
+      redirect: true
+    });
+    
+    // As a fallback, use client-side navigation if the signOut redirect doesn't work
+    setTimeout(() => {
+      if (status !== 'loading' && !session) {
+        router.push('/');
+        router.refresh();
+      }
+    }, 500);
   };
 
   return (

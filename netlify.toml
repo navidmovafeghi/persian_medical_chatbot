@@ -19,6 +19,18 @@
 # Let the Next.js plugin handle all routing by default
 # The plugin will automatically route all requests to the appropriate function
 
+# Handle NextAuth sign-out redirects explicitly
+[[redirects]]
+  from = "/api/auth/signout"
+  to = "/api/auth/signout"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/signout/callback"
+  to = "/"
+  status = 302
+  force = true
+
 # Only add explicit redirects for the auth paths that are causing issues
 [[redirects]]
   from = "/auth/*"

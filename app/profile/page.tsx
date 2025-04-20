@@ -280,6 +280,14 @@ export default function ProfilePage() {
       <div className={styles.formSection}>
         <h2>اطلاعات شخصی</h2>
         
+        {/* User Email Section */}
+        {session?.user?.email && (
+          <div className={styles.emailContainer}>
+            <div className={styles.emailLabel}>آدرس ایمیل شما:</div>
+            <div className={styles.emailValue}>{session.user.email}</div>
+          </div>
+        )}
+        
         <div className={styles.formGroup}>
           <label htmlFor="gender" className={styles.label}>جنسیت:</label>
           <select
