@@ -68,19 +68,31 @@
 }
 
 .appointmentLink {
-  color: #2563eb;
-  text-decoration: none;
-  font-weight: bold;
-  padding: 0.5rem 1rem;
-  border: 1px solid #2563eb;
-  border-radius: 6px;
-  transition: all 0.2s ease;
   display: inline-block;
+  margin-top: 1rem;
+  margin-left: 1rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #f5f5f5;
+  color: #333;
+  text-decoration: none;
+  border-radius: 5px;
+  text-align: center;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.appointmentLinkHighlight {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.appointmentLinkHighlight:hover {
+  background-color: #2563eb !important;
+  color: white !important;
 }
 
 .appointmentLink:hover {
-  background-color: #2563eb;
-  color: white;
+  background-color: #e5e5e5;
 }
 
 .formSection {
@@ -207,6 +219,26 @@
   .formRow {
     flex-direction: column;
     gap: 0;
+  }
+  
+  .backLink {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .appointmentLink {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .sectionHeader button {
+    width: 100%;
   }
 }
 
@@ -347,25 +379,13 @@
   }
 }
 
-@media (max-width: 600px) {
-  .sectionHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .sectionHeader button {
-    width: 100%;
-  }
-}
-
 /* Email section styles */
 .emailContainer {
-  background-color: #f5f9ff;
-  border: 1px solid #d1e5ff;
-  border-radius: 8px;
+  background-color: #f0f8ff;
   padding: 1rem;
+  border-radius: 8px;
   margin-bottom: 1.5rem;
+  border: 1px solid #d1e3fa;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -383,4 +403,12 @@
   direction: ltr;
   text-align: left;
   word-break: break-all;
+}
+
+.backLink {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
 } 

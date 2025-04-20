@@ -1,0 +1,480 @@
+/* Dashboard Container */
+.dashboardContainer {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+  direction: rtl;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.title {
+  font-size: 1.8rem;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.welcome {
+  color: #666;
+  margin: 0;
+}
+
+.userEmail {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.actionsContainer {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.actionButton {
+  background-color: #edf2f7;
+  color: #4a5568;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.appointmentsButton {
+  background-color: #3b82f6;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.appointmentIcon {
+  font-size: 1.1rem;
+}
+
+.actionButton:hover {
+  background-color: #e2e8f0;
+}
+
+.appointmentsButton:hover {
+  background-color: #2563eb;
+}
+
+/* Dashboard Grid */
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+/* Mobile Tabs */
+.tabContainer {
+  display: none;
+}
+
+.tabButtons {
+  display: flex;
+  overflow-x: auto;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.tabButton {
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+  color: #4b5563;
+  flex: 1;
+  text-align: center;
+}
+
+.tabButtonActive {
+  color: #3b82f6;
+  border-bottom: 2px solid #3b82f6;
+  font-weight: 500;
+}
+
+.tabContent {
+  display: none;
+}
+
+.activeTab {
+  display: block;
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.cardIcon {
+  margin-left: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.seeAllLink {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.seeAllLink:hover {
+  text-decoration: underline;
+}
+
+.cardBody {
+  padding: 1rem;
+}
+
+/* Stats */
+.statItem {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed #eaeaea;
+}
+
+.statItem:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.statLabel {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.statValue {
+  color: #1f2937;
+  font-weight: 400;
+}
+
+/* Appointments */
+.appointmentList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.appointmentItem {
+  padding: 0.75rem;
+  border-radius: 4px;
+  background: #f9fafb;
+  margin-bottom: 0.75rem;
+}
+
+.appointmentItem:last-child {
+  margin-bottom: 0;
+}
+
+.appointmentTitle {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: #1f2937;
+}
+
+.appointmentDate {
+  color: #4b5563;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Lab Results */
+.labResultList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.labResultItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-radius: 4px;
+  background: #f9fafb;
+  margin-bottom: 0.75rem;
+}
+
+.labResultItem:last-child {
+  margin-bottom: 0;
+}
+
+.labResultName {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.labResultDate {
+  color: #4b5563;
+  font-size: 0.85rem;
+}
+
+.labResultValue {
+  font-weight: 600;
+  color: #1f2937;
+  text-align: left;
+}
+
+/* Chat Messages */
+.chatMessagesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.chatMessage {
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.chatMessageUser {
+  background: #eff6ff;
+  align-self: flex-end;
+  border-radius: 10px 10px 0 10px;
+}
+
+.chatMessageBot {
+  background: #f3f4f6;
+  align-self: flex-start;
+  border-radius: 10px 10px 10px 0;
+  max-width: 90%;
+}
+
+.messageSender {
+  font-size: 0.8rem;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+
+.messageText {
+  color: #1f2937;
+}
+
+/* Empty States */
+.emptyState {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #6b7280;
+}
+
+.emptyStateButton {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.emptyStateButton:hover {
+  background-color: #2563eb;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+/* Appointment Banner */
+.appointmentBanner {
+  background: linear-gradient(to left, #3b82f6, #2563eb);
+  border-radius: 1rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.appointmentBannerContent {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  position: relative;
+}
+
+.appointmentBannerIcon {
+  font-size: 2.5rem;
+  margin-left: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.appointmentBannerText {
+  flex: 1;
+}
+
+.appointmentBannerText h2 {
+  color: white;
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.appointmentBannerText p {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.appointmentBannerButton {
+  background-color: white;
+  color: #2563eb;
+  padding: 0.7rem 1.5rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.appointmentBannerButton:hover {
+  background-color: #f8fafc;
+  transform: translateY(-2px);
+}
+
+/* Appointment Management in Tab View */
+.appointmentManagement {
+  background-color: #ebf5ff;
+  padding: 1.5rem;
+  margin: 0 1.5rem 1.5rem;
+  border-radius: 0.75rem;
+}
+
+.appointmentManagementContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.appointmentManagementContent h3 {
+  color: #2563eb;
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.appointmentManagementContent p {
+  color: #4b5563;
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+  max-width: 600px;
+}
+
+.appointmentManagementButton {
+  background-color: #2563eb;
+  color: white;
+  padding: 0.7rem 1.5rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.appointmentManagementButton:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .actionsContainer {
+    margin-top: 1rem;
+    width: 100%;
+  }
+  
+  .actionButton {
+    flex: 1;
+    text-align: center;
+  }
+  
+  .tabContainer {
+    display: block;
+  }
+  
+  .dashboardGrid {
+    display: none;
+  }
+  
+  .dashboardGrid.activeTab {
+    display: grid;
+  }
+  
+  .appointmentBannerContent {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem 1rem;
+  }
+  
+  .appointmentBannerIcon {
+    margin: 0 0 1rem 0;
+  }
+  
+  .appointmentBannerButton {
+    margin-top: 1rem;
+    width: 100%;
+    text-align: center;
+  }
+  
+  .appointmentManagement {
+    margin: 0 0 1.5rem;
+    padding: 1.25rem 1rem;
+  }
+} 
