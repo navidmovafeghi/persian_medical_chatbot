@@ -109,4 +109,14 @@
 
 .backLink a:hover {
   text-decoration: underline;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 18px;
+  color: var(--primary);
+  text-align: center;
 } 

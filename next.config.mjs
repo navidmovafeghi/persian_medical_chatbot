@@ -4,12 +4,8 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['bcryptjs', '@prisma/client', 'pg'],
   },
-  // Add source maps for proper error reporting
-  productionBrowserSourceMaps: true,
-  // Support root paths
-  basePath: '',
-  // More detailed error reporting
-  reactStrictMode: true
+  // Support Netlify deployments
+  assetPrefix: process.env.NETLIFY ? '/' : undefined,
 }
 
 export default nextConfig 

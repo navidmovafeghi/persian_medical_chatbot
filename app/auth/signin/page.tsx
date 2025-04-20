@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
@@ -12,15 +12,21 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Handle mounting state to avoid hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    if (isRegister) {
-      // Register - make a POST request to register API
-      try {
+    try {
+      if (isRegister) {
+        // Register - make a POST request to register API
         const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -34,20 +40,19 @@ export default function SignIn() {
         }
         
         // Sign in after successful registration
-        await signIn('credentials', {
+        const result = await signIn('credentials', {
           email,
           password,
-          redirect: true,
-          callbackUrl: '/',
+          redirect: false,
         });
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'خطا در ثبت نام';
-        setError(errorMessage);
-        setLoading(false);
-      }
-    } else {
-      // Login
-      try {
+        
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+        
+        router.push('/');
+      } else {
+        // Login
         const result = await signIn('credentials', {
           email,
           password,
@@ -56,16 +61,22 @@ export default function SignIn() {
         
         if (result?.error) {
           setError('ایمیل یا رمز عبور اشتباه است.');
-          setLoading(false);
         } else {
           router.push('/');
         }
-      } catch (error) {
-        setError('خطا در ورود به سیستم');
-        setLoading(false);
       }
+    } catch (error: any) {
+      const errorMessage = error?.message || 'خطا در اتصال به سرور';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Only render the form when the component has mounted on the client
+  if (!mounted) {
+    return <div className={styles.loading}>در حال بارگذاری...</div>;
+  }
 
   return (
     <div className={styles.container}>
