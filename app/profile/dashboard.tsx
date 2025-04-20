@@ -422,8 +422,8 @@ export default function Dashboard() {
               <span className={styles.cardIcon}>🔬</span>
               آخرین نتایج آزمایش
             </h2>
-            <Link href="/profile#laboratory" className={styles.seeAllLink}>
-              مشاهده همه ↗
+            <Link href="/profile/enhanced?tab=laboratory" className={styles.seeAllLink}>
+              مدیریت و آپلود ↗
             </Link>
           </div>
           <div className={styles.cardBody}>
