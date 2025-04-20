@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -8,7 +8,8 @@ import Dashboard from '../dashboard';
 import LaboratorySection from '../../components/LaboratorySection';
 import styles from '../profile.module.css';
 
-export default function EnhancedProfilePage() {
+// Create a client component that uses useSearchParams
+function EnhancedProfileContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -73,5 +74,14 @@ export default function EnhancedProfilePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap the component that uses useSearchParams in Suspense
+export default function EnhancedProfilePage() {
+  return (
+    <Suspense fallback={<div className={styles.loading}>در حال بارگذاری...</div>}>
+      <EnhancedProfileContent />
+    </Suspense>
   );
 } 
