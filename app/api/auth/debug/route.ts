@@ -5,7 +5,7 @@ import prisma from '@/lib/db';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, testPassword } = body;
 
     if (!email) {
       return NextResponse.json(
@@ -32,25 +32,60 @@ export async function POST(request: Request) {
       );
     }
 
+    // Test database connection
+    let dbStatus = "Connected";
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (err) {
+      dbStatus = `Error: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
     // For security, only return partial password hash to verify it exists
     const partialHash = user.password ? 
       `${user.password.substring(0, 10)}...` : 
       'No password set';
+      
+    // Check password validity if testPassword is provided
+    let passwordStatus = null;
+    if (testPassword && user.password) {
+      try {
+        const isValid = await bcrypt.compare(testPassword, user.password);
+        passwordStatus = {
+          isValid,
+          message: isValid ? "Password is valid" : "Password is invalid"
+        };
+      } catch (err) {
+        passwordStatus = {
+          isValid: false,
+          error: err instanceof Error ? err.message : String(err)
+        };
+      }
+    }
 
     return NextResponse.json({
       message: 'User found',
+      database: {
+        status: dbStatus
+      },
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         hasPassword: !!user.password,
-        passwordFormat: partialHash
-      }
+        passwordFormat: partialHash,
+        passwordStatus
+      },
+      serverTime: new Date().toISOString()
     });
   } catch (error) {
     console.error('Debug endpoint error:', error);
     return NextResponse.json(
-      { error: 'Error checking user', details: error },
+      { 
+        error: 'Error checking user', 
+        details: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        serverTime: new Date().toISOString()
+      },
       { status: 500 }
     );
   }
