@@ -17,7 +17,17 @@
   included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**", "node_modules/pdfjs-dist/**", "node_modules/tesseract.js/**"]
   external_node_modules = ["bcryptjs", "@prisma/client", "pg", "pdfjs-dist", "tesseract.js"]
   node_bundler = "esbuild"
+
+# Define function-specific settings
+[[functions]]
+  # Apply this to all functions
+  pattern = "*"
   # Increase timeouts for OCR operations which can be time-consuming
+  included_files = []
+  excluded_files = []
+  external_node_modules = []
+  ignore_package_json_engines = false
+  node_bundler = "esbuild"
   timeout = 60
 
 # Let the Next.js plugin handle all routing by default
