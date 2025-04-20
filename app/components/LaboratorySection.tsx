@@ -161,19 +161,82 @@ export default function LaboratorySection() {
   };
   
   // Handle the extracted data from OCR
-  const handleExtractedData = async (extractedData: any) => {
-    setFormData({
-      testName: extractedData.testName || '',
-      testDate: extractedData.testDate || new Date().toISOString().split('T')[0],
-      result: extractedData.result || '',
-      unit: extractedData.unit || '',
-      normalRange: extractedData.normalRange || '',
-      notes: extractedData.notes || '',
-    });
+  const handleExtractedData = async (extractedData: any[] | any) => {
+    console.log('[CLIENT] Received test results:', extractedData);
     
-    // Toggle forms
-    setShowUploadForm(false);
-    setShowForm(true);
+    // If no data was extracted, show error
+    if (!extractedData || (Array.isArray(extractedData) && extractedData.length === 0)) {
+      setSubmitError('هیچ اطلاعاتی از فایل استخراج نشد');
+      return;
+    }
+    
+    // If we have multiple test results, save them one by one
+    if (Array.isArray(extractedData) && extractedData.length > 0) {
+      setSubmitting(true);
+      setSubmitError(null);
+      
+      try {
+        // Save each test result
+        for (const testResult of extractedData) {
+          // Skip empty results
+          if (!testResult.testName || !testResult.testDate) {
+            continue;
+          }
+          
+          const response = await fetch('/api/laboratory', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(testResult),
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to save laboratory data');
+          }
+        }
+        
+        // Success! Close the form and refresh data
+        setShowForm(false);
+        setShowUploadForm(false);
+        
+        // Reset form data
+        setFormData({
+          testName: '',
+          testDate: new Date().toISOString().split('T')[0],
+          result: '',
+          unit: '',
+          normalRange: '',
+          notes: '',
+        });
+        
+        // Refresh laboratory data
+        const refreshResponse = await fetch('/api/laboratory');
+        const refreshData = await refreshResponse.json();
+        setLaboratoryData(refreshData.laboratoryData || []);
+      } catch (error) {
+        console.error('Error saving laboratory data:', error);
+        setSubmitError(error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات آزمایشگاهی');
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // Handle single result (backward compatibility)
+      const singleResult = extractedData as any; // Cast to any for backward compatibility
+      setFormData({
+        testName: singleResult.testName || '',
+        testDate: singleResult.testDate || new Date().toISOString().split('T')[0],
+        result: singleResult.result || '',
+        unit: singleResult.unit || '',
+        normalRange: singleResult.normalRange || '',
+        notes: singleResult.notes || '',
+      });
+      
+      // Toggle forms
+      setShowUploadForm(false);
+      setShowForm(true);
+    }
   };
   
   // Format date for display

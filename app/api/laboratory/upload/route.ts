@@ -112,43 +112,124 @@ async function extractTextFromPDF(filePath: string): Promise<string> {
 
 // Function to parse the extracted text to structured data
 function parseLabResults(text: string) {
-  // This is a simple implementation.
-  // In a real-world scenario, you would use more sophisticated NLP or regex
-  // to extract data from different lab result formats
-  
-  // Extract test name
-  const testNameMatch = text.match(/^([A-Za-z\s\(\)]+)/m);
-  const testName = testNameMatch ? testNameMatch[1].trim() : '';
-  
+  // Extract common metadata
   // Extract date
   const dateMatch = text.match(/Date:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/);
-  const testDate = dateMatch ? dateMatch[1].trim() : '';
+  const testDate = dateMatch ? dateMatch[1].trim() : new Date().toISOString().split('T')[0];
   
-  // Try to find specific test results
-  // This is just an example for hemoglobin; you would expand this for various tests
-  const hemoglobinMatch = text.match(/Hemoglobin[\s\(Hgb\)]*:\s*([\d\.]+)\s*([a-zA-Z\/]+)\s*\(Normal Range:\s*([\d\.\-]+)\s*([a-zA-Z\/]+)\)/);
+  // Initialize an array to hold all test results
+  const testResults = [];
   
-  if (hemoglobinMatch) {
-    return {
-      testName: testName || 'Hemoglobin',
+  // Try to find blood cell count tests
+  const cbcTests = [
+    { name: 'WBC', regex: /White\s*Blood\s*Cells?|WBC|Leukocytes?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'RBC', regex: /Red\s*Blood\s*Cells?|RBC|Erythrocytes?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Hemoglobin', regex: /Hemoglobin[\s\(Hgb\)]*[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Hematocrit', regex: /Hematocrit[\s\(Hct\)]*[\s\:]*([0-9\.]+)\s*([a-zA-Z\/\%]+)/ },
+    { name: 'Platelets', regex: /Platelets?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
+  ];
+  
+  // Check for each CBC test
+  cbcTests.forEach(test => {
+    const match = text.match(test.regex);
+    if (match) {
+      testResults.push({
+        testName: test.name,
+        testDate: testDate,
+        result: match[1],
+        unit: match[2] || '',
+        normalRange: '',
+        notes: 'Extracted from uploaded file'
+      });
+    }
+  });
+  
+  // Try to find blood chemistry tests
+  const chemistryTests = [
+    { name: 'Glucose', regex: /Glucose|Blood\s*Sugar[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Cholesterol', regex: /Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Triglycerides', regex: /Triglycerides[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'HDL', regex: /HDL[\s\-]*Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'LDL', regex: /LDL[\s\-]*Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
+  ];
+  
+  // Check for each chemistry test
+  chemistryTests.forEach(test => {
+    const match = text.match(test.regex);
+    if (match) {
+      testResults.push({
+        testName: test.name,
+        testDate: testDate,
+        result: match[1],
+        unit: match[2] || '',
+        normalRange: '',
+        notes: 'Extracted from uploaded file'
+      });
+    }
+  });
+  
+  // Try to find liver function tests
+  const liverTests = [
+    { name: 'AST', regex: /AST|SGOT[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'ALT', regex: /ALT|SGPT[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'ALP', regex: /Alkaline\s*Phosphatase|ALP[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Bilirubin', regex: /Bilirubin[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
+  ];
+  
+  // Check for each liver test
+  liverTests.forEach(test => {
+    const match = text.match(test.regex);
+    if (match) {
+      testResults.push({
+        testName: test.name,
+        testDate: testDate,
+        result: match[1],
+        unit: match[2] || '',
+        normalRange: '',
+        notes: 'Extracted from uploaded file'
+      });
+    }
+  });
+  
+  // Try to find kidney function tests
+  const kidneyTests = [
+    { name: 'Creatinine', regex: /Creatinine[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'BUN', regex: /BUN|Blood\s*Urea\s*Nitrogen[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
+    { name: 'Uric Acid', regex: /Uric\s*Acid[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
+  ];
+  
+  // Check for each kidney test
+  kidneyTests.forEach(test => {
+    const match = text.match(test.regex);
+    if (match) {
+      testResults.push({
+        testName: test.name,
+        testDate: testDate,
+        result: match[1],
+        unit: match[2] || '',
+        normalRange: '',
+        notes: 'Extracted from uploaded file'
+      });
+    }
+  });
+  
+  // If no specific tests matched, create a general lab result
+  if (testResults.length === 0) {
+    // Extract test name (fallback)
+    const testNameMatch = text.match(/^([A-Za-z\s\(\)]+)/m);
+    const testName = testNameMatch ? testNameMatch[1].trim() : 'Lab Test';
+    
+    testResults.push({
+      testName: testName,
       testDate: testDate,
-      // Convert date format if needed
-      result: hemoglobinMatch[1],
-      unit: hemoglobinMatch[2],
-      normalRange: hemoglobinMatch[3] + ' ' + hemoglobinMatch[4],
-      notes: 'Automatically extracted from uploaded file',
-    };
+      result: '',
+      unit: '',
+      normalRange: '',
+      notes: 'Please review and enter test results manually. Extraction was incomplete.',
+    });
   }
   
-  // If no specific test matched, return basic info
-  return {
-    testName: testName || 'Lab Test',
-    testDate: testDate,
-    result: '',
-    unit: '',
-    normalRange: '',
-    notes: 'Please review and enter test results manually. Extraction was incomplete.',
-  };
+  return testResults;
 }
 
 // Simple metadata extraction based on filename and file type for fallback
