@@ -15,14 +15,14 @@
 
 # Function configuration
 [functions]
-  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**", "node_modules/pdfjs-dist/**", "node_modules/tesseract.js/**"]
-  external_node_modules = ["bcryptjs", "@prisma/client", "pg", "pdfjs-dist", "tesseract.js"]
+  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**"]
+  external_node_modules = ["bcryptjs", "@prisma/client", "pg"]
   node_bundler = "esbuild"
 
 # Function-specific settings for longer timeout
 [functions.upload]
   pattern = "api/laboratory/upload"
-  timeout = 60
+  timeout = 30
 
 # Let the Next.js plugin handle all routing by default
 # The plugin will automatically route all requests to the appropriate function
