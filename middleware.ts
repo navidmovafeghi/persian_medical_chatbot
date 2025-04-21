@@ -13,6 +13,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Get the path of the current request
+  const path = request.nextUrl.pathname;
+
+  // Protect cron job API routes with a special header check
+  if (path.startsWith('/api/pills/reminders') || path.startsWith('/api/appointments/reminders')) {
+    const apiKey = request.headers.get('x-api-key');
+    const configuredApiKey = process.env.CRON_API_KEY;
+    
+    // Skip checking in development for easier testing
+    if (process.env.NODE_ENV !== 'development') {
+      if (!apiKey || apiKey !== configuredApiKey) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
+  }
+
   // Let other requests pass through
   return NextResponse.next();
 }
@@ -23,5 +39,8 @@ export const config = {
     // Apply to auth-related paths
     '/api/auth/:path*',
     '/auth/:path*',
+    // Only run middleware on the API routes we want to protect
+    '/api/pills/reminders/:path*',
+    '/api/appointments/reminders/:path*',
   ],
 }; 
