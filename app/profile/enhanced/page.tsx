@@ -67,6 +67,9 @@ function EnhancedProfileContent() {
           <LaboratorySection />
           
           <div className={styles.backLink}>
+            <Link href="/" className={`${styles.appointmentLink} ${styles.appointmentLinkHighlight}`}>
+              چت با پزشک هوشمند
+            </Link>
             <Link href="/profile" className={styles.appointmentLink}>
               بازگشت به پروفایل
             </Link>

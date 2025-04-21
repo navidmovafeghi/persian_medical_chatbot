@@ -6,6 +6,10 @@ import LabResultUpload from './LabResultUpload';
 import styles from '../profile/profile.module.css';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { format } from 'date-fns-jalali';
+import ManualLabEntry from './ManualLabEntry';
+import LabResultsChart from './LabResultsChart';
+import Link from 'next/link';
 
 // Laboratory data interface
 interface LaboratoryData {
@@ -29,7 +33,29 @@ interface ExtractedData {
   labName?: string;
 }
 
-export default function LaboratorySection() {
+// Add a new interface for the grouped lab results
+interface GroupedLabResults {
+  id: string;
+  fileId: string;
+  reportDate: string;
+  results: LaboratoryData[];
+}
+
+interface LabResult {
+  id: string;
+  testName: string;
+  testDate: string;
+  result: string;
+  unit: string;
+  normalRange: string;
+  notes: string | null;
+}
+
+interface LaboratorySectionProps {
+  initialResults?: LabResult[];
+}
+
+export default function LaboratorySection({ initialResults = [] }: LaboratorySectionProps) {
   const { data: session } = useSession();
   const isAuthenticated = !!session?.user;
   
@@ -40,6 +66,7 @@ export default function LaboratorySection() {
   // State for form
   const [showForm, setShowForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   const [formData, setFormData] = useState({
     testName: '',
     testDate: new Date().toISOString().split('T')[0],
@@ -53,6 +80,16 @@ export default function LaboratorySection() {
   const [isUploading, setIsUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
+  // Add state for grouped lab data
+  const [groupedLabData, setGroupedLabData] = useState<GroupedLabResults[]>([]);
+  
+  const [results, setResults] = useState<LabResult[]>(initialResults);
+  
+  const router = useRouter();
+
+  // Add a state for the active tab
+  const [activeTab, setActiveTab] = useState<'table' | 'chart'>('chart');
+
   // Fetch laboratory data
   useEffect(() => {
     const fetchLaboratoryData = async () => {
@@ -70,6 +107,28 @@ export default function LaboratorySection() {
         
         const data = await response.json();
         setLaboratoryData(data.laboratoryData || []);
+        
+        // Group lab data by report date
+        const groupedData: { [key: string]: GroupedLabResults } = {};
+        
+        (data.laboratoryData || []).forEach((lab: LaboratoryData) => {
+          // Extract fileId or use date as grouping key
+          const fileId = lab.notes?.match(/fileId:([a-z0-9-]+)/)?.[1] || '';
+          const groupKey = fileId || lab.testDate;
+          
+          if (!groupedData[groupKey]) {
+            groupedData[groupKey] = {
+              id: groupKey,
+              fileId: fileId,
+              reportDate: lab.testDate,
+              results: []
+            };
+          }
+          
+          groupedData[groupKey].results.push(lab);
+        });
+        
+        setGroupedLabData(Object.values(groupedData));
       } catch (error) {
         console.error('Error fetching laboratory data:', error);
         setError('خطا در دریافت اطلاعات آزمایشگاهی');
@@ -196,6 +255,8 @@ export default function LaboratorySection() {
       
       try {
         let savedCount = 0;
+        // Generate a unique ID for this report
+        const reportFileId = `report-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         for (const result of extractedData) {
           if (result.testName && result.value) {
@@ -206,23 +267,37 @@ export default function LaboratorySection() {
               result: result.value, // Use value field from extracted data
               unit: result.unit || '',
               normalRange: result.normalRange || '',
-              notes: result.labName ? `Lab: ${result.labName}` : '',
+              notes: `${result.labName ? `Lab: ${result.labName}` : ''} fileId:${reportFileId}`,
             };
             
-            const response = await fetch('/api/laboratory', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(testData),
-            });
-
-            if (!response.ok) {
-              throw new Error(`Failed to save: ${response.statusText}`);
-            }
+            console.log('Saving lab test:', testData);
             
-            savedCount++;
+            try {
+              const response = await fetch('/api/laboratory', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(testData),
+              });
+              
+              const responseData = await response.json();
+              
+              if (!response.ok) {
+                console.error('API response error:', responseData);
+                throw new Error(responseData.error || `Failed to save: ${response.statusText}`);
+              }
+              
+              savedCount++;
+            } catch (saveError) {
+              console.error('Error saving individual test:', saveError);
+              // Continue with other tests even if one fails
+            }
           }
+        }
+        
+        if (savedCount === 0) {
+          throw new Error('No tests could be saved. Please check your login status and try again.');
         }
         
         // Success! Close the form and refresh data
@@ -243,10 +318,36 @@ export default function LaboratorySection() {
         toast.success(`${savedCount} نتیجه با موفقیت ذخیره شد`);
         
         // Refresh laboratory data
-        const refreshResponse = await fetch('/api/laboratory');
-        const refreshData = await refreshResponse.json();
-        setLaboratoryData(refreshData.laboratoryData || []);
-        
+        try {
+          const refreshResponse = await fetch('/api/laboratory');
+          const refreshData = await refreshResponse.json();
+          setLaboratoryData(refreshData.laboratoryData || []);
+          
+          // Group lab data by report date
+          const groupedData: { [key: string]: GroupedLabResults } = {};
+          
+          (refreshData.laboratoryData || []).forEach((lab: LaboratoryData) => {
+            // Extract fileId or use date as grouping key
+            const fileId = lab.notes?.match(/fileId:([a-z0-9-]+)/)?.[1] || '';
+            const groupKey = fileId || lab.testDate;
+            
+            if (!groupedData[groupKey]) {
+              groupedData[groupKey] = {
+                id: groupKey,
+                fileId: fileId,
+                reportDate: lab.testDate,
+                results: []
+              };
+            }
+            
+            groupedData[groupKey].results.push(lab);
+          });
+          
+          setGroupedLabData(Object.values(groupedData));
+        } catch (refreshError) {
+          console.error('Error refreshing laboratory data:', refreshError);
+          // Don't throw, we already saved the data successfully
+        }
       } catch (error: any) {
         console.error('Error saving laboratory data:', error);
         setSubmitError(error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات آزمایشگاهی');
@@ -282,208 +383,153 @@ export default function LaboratorySection() {
   // Format date for display
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('fa-IR');
+      const date = new Date(dateString);
+      return format(date, "yyyy/MM/dd");
     } catch (e) {
       return dateString;
     }
   };
   
+  const closeAllForms = () => {
+    setShowUploadForm(false);
+    setShowForm(false);
+    setShowManualForm(false);
+  };
+
   return (
-    <div className={styles.formSection} id="laboratory">
+    <div className={styles.profileSection}>
       <div className={styles.sectionHeader}>
         <h2>نتایج آزمایشگاهی</h2>
-        <div className={styles.actionButtons}>
-          <button
-            className={styles.uploadButton}
+        <div className={styles.sectionActions}>
+          <Link href="/" className={styles.actionButton} style={{ backgroundColor: '#10b981' }}>
+            <span className={styles.buttonIcon}>💬</span>
+            چت با پزشک هوشمند
+          </Link>
+          <button 
+            className={styles.actionButton} 
             onClick={() => {
+              closeAllForms();
               setShowUploadForm(true);
-              setShowForm(false);
             }}
-            disabled={isLoading || showForm || showUploadForm}
           >
+            <span className={styles.buttonIcon}>📄</span>
             آپلود از فایل
           </button>
-          <button
-            className={styles.addButton}
+          <button 
+            className={styles.actionButton}
             onClick={() => {
-              setShowForm(true);
-              setShowUploadForm(false);
+              closeAllForms();
+              setShowManualForm(true);
             }}
-            disabled={isLoading || showForm || showUploadForm}
           >
+            <span className={styles.buttonIcon}>✏️</span>
             افزودن دستی
           </button>
         </div>
       </div>
-      
-      {error && <div className={styles.errorMessage}>{error}</div>}
-      
-      {/* Upload Form */}
+
+      {/* Tab navigation */}
+      {laboratoryData.length > 0 && (
+        <div className={styles.tabButtons}>
+          <button 
+            className={`${styles.tabButton} ${activeTab === 'chart' ? styles.activeTab : ''}`}
+            onClick={() => setActiveTab('chart')}
+          >
+            نمودار
+          </button>
+          <button 
+            className={`${styles.tabButton} ${activeTab === 'table' ? styles.activeTab : ''}`}
+            onClick={() => setActiveTab('table')}
+          >
+            جدول
+          </button>
+        </div>
+      )}
+
+      {/* Chart view */}
+      {laboratoryData.length > 0 && activeTab === 'chart' && (
+        <LabResultsChart laboratoryData={laboratoryData} />
+      )}
+
+      {/* Table view */}
+      {(laboratoryData.length === 0 || activeTab === 'table') && (
+        results.length > 0 ? (
+          <div className={styles.dataTable}>
+            <div className={styles.tableHeader}>
+              <div className={styles.tableHeaderCell}>نام آزمایش</div>
+              <div className={styles.tableHeaderCell}>تاریخ</div>
+              <div className={styles.tableHeaderCell}>نتیجه</div>
+              <div className={styles.tableHeaderCell}>واحد</div>
+              <div className={styles.tableHeaderCell}>محدوده نرمال</div>
+              <div className={styles.tableHeaderCell}>توضیحات</div>
+              <div className={styles.tableHeaderCell}>عملیات</div>
+            </div>
+            {results.map((result) => (
+              <div key={result.id} className={styles.tableRow}>
+                <div className={styles.tableCell}>{result.testName}</div>
+                <div className={styles.tableCell}>{formatDate(result.testDate)}</div>
+                <div className={styles.tableCell}>{result.result}</div>
+                <div className={styles.tableCell}>{result.unit}</div>
+                <div className={styles.tableCell}>{result.normalRange}</div>
+                <div className={styles.tableCell}>{result.notes}</div>
+                <div className={styles.tableCell}>
+                  <button 
+                    className={styles.deleteButton}
+                    onClick={() => handleDelete(result.id)}
+                  >
+                    حذف
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateIcon}>🔬</div>
+            <p>هنوز هیچ نتیجه آزمایشی ثبت نشده است.</p>
+            <p>با استفاده از دکمه های بالا نتایج آزمایش خود را اضافه کنید.</p>
+          </div>
+        )
+      )}
+
       {showUploadForm && (
-        <div className={styles.modalBackdrop}>
-          <div className={styles.modalContent}>
-            <button 
-              onClick={() => setShowUploadForm(false)}
-              className={styles.closeButton}
-            >
-              ✕
-            </button>
-            <h3>آپلود نتیجه آزمایش</h3>
-            <LabResultUpload 
-              onDataExtracted={handleExtractedData} 
-              onCancel={() => setShowUploadForm(false)}
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Manual Form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className={styles.labForm}>
-          <div className={styles.formGroup}>
-            <label htmlFor="testName" className={styles.label}>نام آزمایش</label>
-            <input
-              id="testName"
-              name="testName"
-              type="text"
-              value={formData.testName}
-              onChange={handleInputChange}
-              className={styles.input}
-              required
-            />
-          </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="testDate" className={styles.label}>تاریخ آزمایش</label>
-            <input
-              id="testDate"
-              name="testDate"
-              type="date"
-              value={formData.testDate}
-              onChange={handleInputChange}
-              className={styles.input}
-              required
-            />
-          </div>
-          
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="result" className={styles.label}>نتیجه</label>
-              <input
-                id="result"
-                name="result"
-                type="text"
-                value={formData.result}
-                onChange={handleInputChange}
-                className={styles.input}
-                required
-              />
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h3>آپلود نتایج آزمایش</h3>
+              <button 
+                className={styles.modalClose}
+                onClick={() => setShowUploadForm(false)}
+              >
+                ×
+              </button>
             </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="unit" className={styles.label}>واحد (اختیاری)</label>
-              <input
-                id="unit"
-                name="unit"
-                type="text"
-                value={formData.unit}
-                onChange={handleInputChange}
-                className={styles.input}
+            <div className={styles.modalBody}>
+              <LabResultUpload 
+                onDataExtracted={handleExtractedData} 
+                onCancel={() => setShowUploadForm(false)} 
               />
             </div>
           </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="normalRange" className={styles.label}>محدوده نرمال (اختیاری)</label>
-            <input
-              id="normalRange"
-              name="normalRange"
-              type="text"
-              value={formData.normalRange}
-              onChange={handleInputChange}
-              className={styles.input}
-            />
-          </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="notes" className={styles.label}>توضیحات (اختیاری)</label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={formData.notes}
-              onChange={handleInputChange}
-              className={styles.textarea}
-            ></textarea>
-          </div>
-          
-          {submitError && <div className={styles.errorMessage}>{submitError}</div>}
-          
-          <div className={styles.buttonGroup}>
-            <button
-              type="submit"
-              className={styles.saveButton}
-              disabled={submitting}
-            >
-              {submitting ? 'در حال ذخیره...' : 'ذخیره نتیجه'}
-            </button>
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={() => setShowForm(false)}
-              disabled={submitting}
-            >
-              انصراف
-            </button>
-          </div>
-        </form>
-      )}
-      
-      {/* Laboratory Data List */}
-      {isLoading ? (
-        <div className={styles.loading}>در حال بارگذاری...</div>
-      ) : laboratoryData.length === 0 ? (
-        <div className={styles.noDataMessage}>
-          هیچ نتیجه آزمایشی ثبت نشده است.
         </div>
-      ) : (
-        <div className={styles.labDataContainer}>
-          {laboratoryData.map((labData) => (
-            <div key={labData.id} className={styles.labDataCard}>
-              <div className={styles.labDataHeader}>
-                <h3>{labData.testName}</h3>
-                <button
-                  className={styles.deleteButton}
-                  onClick={() => handleDelete(labData.id)}
-                  disabled={isLoading}
-                >
-                  حذف
-                </button>
-              </div>
-              <div className={styles.labDataDetails}>
-                <p className={styles.labDate}>
-                  <span>تاریخ:</span>
-                  {formatDate(labData.testDate)}
-                </p>
-                <p className={styles.labResult}>
-                  <span>نتیجه:</span>
-                  {labData.result}
-                  {labData.unit && <span className={styles.unit}>{labData.unit}</span>}
-                </p>
-                {labData.normalRange && (
-                  <p className={styles.labNormalRange}>
-                    <span>محدوده نرمال:</span>
-                    {labData.normalRange}
-                  </p>
-                )}
-                {labData.notes && (
-                  <p className={styles.labNotes}>
-                    <span>توضیحات:</span>
-                    {labData.notes}
-                  </p>
-                )}
-              </div>
+      )}
+
+      {showManualForm && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h3>افزودن دستی نتایج آزمایش</h3>
+              <button 
+                className={styles.modalClose}
+                onClick={() => setShowManualForm(false)}
+              >
+                ×
+              </button>
             </div>
-          ))}
+            <div className={styles.modalBody}>
+              <ManualLabEntry onClose={() => setShowManualForm(false)} />
+            </div>
+          </div>
         </div>
       )}
     </div>

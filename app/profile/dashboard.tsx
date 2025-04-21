@@ -274,26 +274,16 @@ export default function Dashboard() {
           </p>
         </div>
         <div className={styles.actionsContainer}>
+          <Link href="/" className={`${styles.actionButton} ${styles.chatButton}`}>
+            <span className={styles.appointmentIcon}>💬</span>
+            چت با پزشک هوشمند
+          </Link>
           <Link href="/appointments" className={`${styles.actionButton} ${styles.appointmentsButton}`}>
             <span className={styles.appointmentIcon}>📅</span>
             مدیریت قرار ملاقات‌ها
           </Link>
           <Link href="/profile/edit" className={styles.actionButton}>
             ویرایش پروفایل
-          </Link>
-        </div>
-      </div>
-      
-      {/* Main appointment banner */}
-      <div className={styles.appointmentBanner}>
-        <div className={styles.appointmentBannerContent}>
-          <div className={styles.appointmentBannerIcon}>📅</div>
-          <div className={styles.appointmentBannerText}>
-            <h2>مدیریت قرار ملاقات‌های پزشکی</h2>
-            <p>رزرو قرار ملاقات با پزشکان، مشاهده تاریخچه و یادآوری قرارهای ملاقات آینده</p>
-          </div>
-          <Link href="/appointments" className={styles.appointmentBannerButton}>
-            مشاهده و مدیریت
           </Link>
         </div>
       </div>
@@ -382,8 +372,8 @@ export default function Dashboard() {
               <span className={styles.cardIcon}>📅</span>
               قرار ملاقات‌های آینده
             </h2>
-            <Link href="/appointments" className={styles.seeAllLink}>
-              مشاهده همه ↗
+            <Link href="/" className={styles.seeAllLink}>
+              چت با پزشک هوشمند ↗
             </Link>
           </div>
           <div className={styles.cardBody}>
@@ -510,18 +500,15 @@ export default function Dashboard() {
               <span className={styles.cardIcon}>📅</span>
               قرار ملاقات‌های پزشکی
             </h2>
-            <Link href="/appointments" className={`${styles.actionButton} ${styles.appointmentsButton}`}>
-              قرار ملاقات جدید
+            <Link href="/" className={`${styles.actionButton} ${styles.chatButton}`}>
+              چت با پزشک هوشمند
             </Link>
           </div>
           
           <div className={styles.appointmentManagement}>
             <div className={styles.appointmentManagementContent}>
-              <h3>مدیریت کامل قرار ملاقات‌های پزشکی</h3>
-              <p>در صفحه مدیریت قرار ملاقات‌ها، می‌توانید قرارهای جدید ثبت کنید، قرارهای موجود را ویرایش کنید و یادآوری‌ها را تنظیم نمایید.</p>
-              <Link href="/appointments" className={styles.appointmentManagementButton}>
-                ورود به صفحه مدیریت قرار ملاقات‌ها
-              </Link>
+              <h3>مدیریت قرار ملاقات‌های پزشکی</h3>
+              <p>در این بخش می‌توانید قرار ملاقات‌های پزشکی خود را مشاهده کنید.</p>
             </div>
           </div>
           
@@ -643,11 +630,11 @@ export default function Dashboard() {
       
       {/* Edit Profile Button at bottom */}
       <div className={profileStyles.backLink}>
+        <Link href="/" className={`${profileStyles.appointmentLink} ${profileStyles.appointmentLinkHighlight}`}>
+          چت با پزشک هوشمند
+        </Link>
         <Link href="/profile/edit" className={profileStyles.appointmentLink}>
           ویرایش اطلاعات پروفایل
-        </Link>
-        <Link href="/appointments" className={`${profileStyles.appointmentLink} ${profileStyles.appointmentLinkHighlight}`}>
-          مدیریت قرار ملاقات‌های پزشکی
         </Link>
       </div>
     </div>
