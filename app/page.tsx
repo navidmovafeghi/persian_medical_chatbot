@@ -34,7 +34,7 @@ export default function Home() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const { data: session, status } = useSession();
-  const isAuthenticated = status === 'authenticated';
+  const isAuthenticated = status === 'authenticated' && session !== null;
 
   // Fetch conversations when user is authenticated
   useEffect(() => {
@@ -52,6 +52,13 @@ export default function Home() {
       setMessages([]);
     }
   }, [activeConversationId, isAuthenticated]);
+
+  // Debug session in Home component
+  useEffect(() => {
+    console.log("Session in Home component:", session);
+    console.log("Auth status in Home component:", status);
+    console.log("Is authenticated:", isAuthenticated);
+  }, [session, status, isAuthenticated]);
 
   // Function to fetch user's conversations
   const fetchConversations = async () => {
@@ -98,6 +105,96 @@ export default function Home() {
   const handleSuggestionClick = (text: string) => {
     if (!isLoading) {
       handleSubmit(text);
+    }
+  };
+
+  // Function to handle lab results file upload
+  const handleFileUpload = async (file: File) => {
+    if (!isAuthenticated) {
+      alert('برای آپلود نتایج آزمایش، لطفا ابتدا وارد حساب کاربری خود شوید');
+      return;
+    }
+    
+    // Add a user message about uploading a file
+    const userMessage: Message = { 
+      text: `آپلود نتایج آزمایش: ${file.name}`, 
+      sender: 'user' 
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Add a temporary loading message from the bot
+    const loadingMessage: Message = {
+      text: 'در حال پردازش نتایج آزمایش...',
+      sender: 'bot',
+    };
+    setMessages(prev => [...prev, loadingMessage]);
+    
+    setIsLoading(true);
+    
+    // Create FormData to send the file
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', 'lab_results');
+    if (activeConversationId) {
+      formData.append('conversationId', activeConversationId);
+    }
+    
+    try {
+      const response = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        // Try to get more detailed error info from the response
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          console.error('Upload error details:', errorData);
+          errorDetails = errorData.details || errorData.error || `Status: ${response.status}`;
+        } catch (jsonError) {
+          errorDetails = `Status: ${response.status}`;
+        }
+        
+        throw new Error(`Upload failed with status: ${response.status}. ${errorDetails}`);
+      }
+      
+      const data = await response.json();
+      
+      // Replace the loading message with the actual bot response
+      const botResponse: Message = { 
+        text: data.response, 
+        sender: 'bot',
+        id: data.labResultsDetected ? `lab_results_${Date.now()}` : undefined
+      };
+      
+      // If lab results were saved directly
+      if (data.labResultsSaved) {
+        botResponse.text = `${botResponse.text} <a href="/profile#laboratory" class="lab-results-link">مشاهده نتایج آزمایش</a>`;
+      }
+      
+      // Replace loading message with bot response
+      setMessages(prev => [...prev.slice(0, -1), botResponse]);
+      
+      // Set conversation ID if this is a new conversation
+      if (!activeConversationId && data.conversationId) {
+        setActiveConversationId(data.conversationId);
+        // Refresh conversations list
+        if (isAuthenticated) {
+          fetchConversations();
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      // Show detailed error message
+      const errorMessage: Message = {
+        text: `خطا در آپلود فایل: ${error instanceof Error ? error.message : 'لطفا مجددا تلاش کنید.'}`,
+        sender: 'bot'
+      };
+      setMessages(prev => [...prev.slice(0, -1), errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -156,6 +253,19 @@ export default function Home() {
 
       const data = await response.json();
       const botResponse: Message = { text: data.response, sender: 'bot' };
+      
+      // Check if lab results were detected
+      if (data.labResultsDetected) {
+        // Enhance the message with special styling or actions if needed
+        botResponse.id = `lab_results_${Date.now()}`;
+        // The response already contains the prompt to save from the API
+      }
+      
+      // Check if lab results were saved
+      if (data.labResultsSaved) {
+        // Add a link to profile in the message
+        botResponse.text = `${botResponse.text} <a href="/profile#laboratory" class="lab-results-link">مشاهده نتایج آزمایش</a>`;
+      }
 
       // Replace the loading message with the actual bot response
       setMessages(prev => [...prev.slice(0, -1), botResponse]);
@@ -186,6 +296,79 @@ export default function Home() {
   // Function to clear messages
   const handleClearChat = () => {
     setMessages([]); 
+  };
+
+  // Function to handle lab result actions (save or discard)
+  const handleLabResultAction = async (action: string) => {
+    if (action === 'save-lab-results') {
+      // Add a user message confirming they want to save the results
+      const userMessage: Message = { 
+        text: 'بله، ذخیره شود', 
+        sender: 'user' 
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Add a temporary loading message from the bot
+      const loadingMessage: Message = {
+        text: 'در حال ذخیره نتایج آزمایش...',
+        sender: 'bot',
+      };
+      setMessages(prev => [...prev, loadingMessage]);
+      
+      try {
+        // Call the API to save the lab results
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: 'بله',
+            conversationId: activeConversationId
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Replace the loading message with the confirmation message
+        const botResponse: Message = { 
+          text: data.response, 
+          sender: 'bot' 
+        };
+        
+        // Add a link to profile if lab results were saved
+        if (data.labResultsSaved) {
+          botResponse.text = `${botResponse.text} <a href="/profile#laboratory" class="lab-results-link">مشاهده نتایج آزمایش</a>`;
+        }
+        
+        // Replace loading message with confirmation
+        setMessages(prev => [...prev.slice(0, -1), botResponse]);
+        
+      } catch (error) {
+        console.error('Error saving lab results:', error);
+        const errorMessage: Message = {
+          text: 'خطا در ذخیره نتایج آزمایش. لطفاً مجدداً تلاش کنید.',
+          sender: 'bot'
+        };
+        setMessages(prev => [...prev.slice(0, -1), errorMessage]);
+      }
+    } else if (action === 'discard-lab-results') {
+      // Add a user message indicating they don't want to save the results
+      const userMessage: Message = { 
+        text: 'خیر، ذخیره نشود', 
+        sender: 'user' 
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Add a bot message acknowledging the decision
+      const botResponse: Message = { 
+        text: 'باشه، نتایج آزمایش ذخیره نشد. آیا می‌توانم به شما کمک دیگری بکنم؟', 
+        sender: 'bot' 
+      };
+      setMessages(prev => [...prev, botResponse]);
+    }
   };
 
   return (
@@ -221,7 +404,8 @@ export default function Home() {
 
           <ChatContainer 
             messages={messages} 
-            isLoading={isLoading} 
+            isLoading={isLoading}
+            onLabResultAction={handleLabResultAction}
           />
           <InputArea
             value={inputValue}
@@ -232,6 +416,7 @@ export default function Home() {
               }
             }}
             disabled={isLoading}
+            onFileUpload={handleFileUpload}
           />
         </div>
 
