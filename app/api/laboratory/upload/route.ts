@@ -7,10 +7,9 @@ import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { existsSync } from 'fs';
-import { tesseractWorkerOptions } from '../../../tesseract-preload';
+import { tesseractWorkerOptions, createTesseractWorker } from '../../../../tesseract-preload';
 import { PrismaClient } from '@prisma/client';
 import PDFParser from 'pdf-parse';
-import { createTesseractWorker } from '../../../tesseract-preload';
 
 const prisma = new PrismaClient();
 

@@ -3,8 +3,7 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import '../../../tesseract-preload'; // Import preload script
-import { tesseractWorkerOptions } from '../../../tesseract-preload';
+import { tesseractWorkerOptions } from '../../../../tesseract-preload'; // Updated path
 
 // Dynamic imports to avoid serverless issues
 let Tesseract: any;

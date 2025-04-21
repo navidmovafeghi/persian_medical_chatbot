@@ -15,8 +15,8 @@
 
 # Function configuration
 [functions]
-  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**"]
-  external_node_modules = ["bcryptjs", "@prisma/client", "pg"]
+  included_files = ["prisma/schema.prisma", "prisma/*.sql", "node_modules/.prisma/**", "node_modules/@prisma/client/**", "tesseract-preload.ts", "node_modules/tesseract.js/**"]
+  external_node_modules = ["bcryptjs", "@prisma/client", "pg", "tesseract.js"]
   node_bundler = "esbuild"
 
 # Function-specific settings for longer timeout
