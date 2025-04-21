@@ -324,6 +324,160 @@ function detectLabResults(message: string): {
   return results.length > 0 ? results : null;
 }
 
+/**
+ * Detects pill reminder intent in a user message
+ * @param message The user message to analyze
+ * @returns Pill reminder data if intent detected, null otherwise
+ */
+function detectPillReminderIntent(message: string): {
+  name: string;
+  dosage: string;
+  frequency: string;
+  times: string;
+  startDate: Date;
+  endDate?: Date;
+  withFood: boolean;
+  notes?: string;
+} | null {
+  // Keywords related to medication reminders in Persian
+  const medicationKeywords = [
+    'دارو', 'قرص', 'کپسول', 'شربت', 'آمپول', 'اسپری', 
+    'یادآور', 'یادآوری', 'مصرف', 'خوردن'
+  ];
+  
+  // Check for medication keywords
+  const containsMedicationKeywords = medicationKeywords.some(keyword => 
+    message.toLowerCase().includes(keyword)
+  );
+  
+  if (!containsMedicationKeywords) {
+    return null;
+  }
+  
+  // Extract medication name
+  let name = '';
+  const namePatterns = [
+    /(?:داروی|قرص|کپسول|شربت|آمپول|اسپری)\s+([^\s,]+(?:\s+[^\s,]+)?)/i,
+    /([^\s,]+(?:\s+[^\s,]+)?)\s+(?:را مصرف می‌کنم|می‌خورم)/i
+  ];
+  
+  for (const pattern of namePatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      name = match[1].trim();
+      break;
+    }
+  }
+  
+  if (!name) {
+    // If no specific name pattern matched, look for any capitalized words
+    // that might be medication names
+    const words = message.split(/\s+/);
+    for (const word of words) {
+      if (word.length > 1 && /^[A-Z]/.test(word) && !/^(I|Me|My|The|A|An)$/i.test(word)) {
+        name = word;
+        break;
+      }
+    }
+  }
+  
+  // If still no name, use a default
+  if (!name) {
+    name = 'دارو';
+  }
+  
+  // Extract dosage
+  let dosage = '1 عدد';
+  const dosagePatterns = [
+    /(\d+(?:\.\d+)?)\s+(?:عدد|میلی‌گرم|گرم|سی‌سی|واحد|قطره|میلی‌لیتر|قاشق)/i,
+    /(\d+(?:\.\d+)?)\s+(?:mg|g|ml|cc|mcg|µg)/i
+  ];
+  
+  for (const pattern of dosagePatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      dosage = match[0].trim();
+      break;
+    }
+  }
+  
+  // Extract frequency
+  let frequency = 'daily';
+  if (message.includes('روزانه') || message.includes('هر روز')) {
+    frequency = 'daily';
+  } else if (message.includes('دو بار در روز') || message.includes('روزی دو بار')) {
+    frequency = 'twice_daily';
+  } else if (message.includes('سه بار در روز') || message.includes('روزی سه بار')) {
+    frequency = 'three_times_daily';
+  } else if (message.includes('هفتگی') || message.includes('هر هفته')) {
+    frequency = 'weekly';
+  } else if (message.includes('ماهانه') || message.includes('هر ماه')) {
+    frequency = 'monthly';
+  } else if (message.includes('در صورت نیاز') || message.includes('موقع نیاز')) {
+    frequency = 'as_needed';
+  }
+  
+  // Extract times
+  let times: string[] = ['08:00'];
+  if (message.includes('صبح')) {
+    times = ['08:00'];
+  } else if (message.includes('ظهر')) {
+    times = ['13:00'];
+  } else if (message.includes('شب')) {
+    times = ['20:00'];
+  } else if (message.includes('صبح و شب') || message.includes('دو بار در روز')) {
+    times = ['08:00', '20:00'];
+  } else if (message.includes('صبح و ظهر و شب') || message.includes('سه بار در روز')) {
+    times = ['08:00', '13:00', '20:00'];
+  }
+  
+  // Extract specific times
+  const timePattern = /ساعت\s?(\d{1,2})(?::(\d{2}))?/gi;
+  let timeMatch;
+  const specificTimes: string[] = [];
+  
+  while ((timeMatch = timePattern.exec(message)) !== null) {
+    const hours = parseInt(timeMatch[1]);
+    const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+    
+    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
+      const formattedHours = hours.toString().padStart(2, '0');
+      const formattedMinutes = minutes.toString().padStart(2, '0');
+      specificTimes.push(`${formattedHours}:${formattedMinutes}`);
+    }
+  }
+  
+  if (specificTimes.length > 0) {
+    times = specificTimes;
+  }
+  
+  // Extract with food preference
+  const withFood = message.includes('با غذا') || 
+                   message.includes('همراه غذا') || 
+                   message.includes('بعد از غذا') ||
+                   message.includes('پس از غذا');
+  
+  // Extract start date (default to today)
+  const startDate = new Date();
+  
+  // Extract notes
+  let notes = undefined;
+  const notesMatch = message.match(/(?:توضیحات|یادداشت):\s*([^\n]+)/i);
+  if (notesMatch && notesMatch[1]) {
+    notes = notesMatch[1].trim();
+  }
+  
+  return {
+    name,
+    dosage,
+    frequency,
+    times: JSON.stringify(times),
+    startDate,
+    withFood,
+    notes
+  };
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -365,7 +519,136 @@ export async function POST(request: Request) {
     // Use null for userId if the user doesn't exist in the database
     const messageUserId = userExists ? userId : null;
 
-    // Check for appointment intent before sending to Gemini
+    // Check for pill reminder intent before other intents
+    const pillReminderIntent = detectPillReminderIntent(userMessage);
+    if (pillReminderIntent && userExists && userId) {
+      // Save the user message
+      await prisma.chatMessage.create({
+        data: {
+          text: userMessage,
+          sender: 'user',
+          userId: messageUserId,
+          conversationId
+        }
+      });
+
+      try {
+        // Create pill reminder based on detected information
+        let pillReminder;
+        let error = null;
+        
+        try {
+          // Try to create the pill reminder
+          pillReminder = await (prisma as any).pillReminder.create({
+            data: {
+              userId,
+              name: pillReminderIntent.name,
+              dosage: pillReminderIntent.dosage,
+              frequency: pillReminderIntent.frequency,
+              times: pillReminderIntent.times,
+              startDate: pillReminderIntent.startDate,
+              endDate: pillReminderIntent.endDate,
+              withFood: pillReminderIntent.withFood,
+              notes: pillReminderIntent.notes,
+              status: 'active',
+              remindBefore: 15, // Default 15 minutes before
+              reminderSent: false
+            }
+          });
+        } catch (err) {
+          error = err;
+          console.error("Error creating pill reminder:", err);
+        }
+
+        // Extract times for display
+        let timesDisplay = '';
+        try {
+          const times = JSON.parse(pillReminderIntent.times);
+          timesDisplay = Array.isArray(times) ? times.join('، ') : '';
+        } catch {
+          timesDisplay = '';
+        }
+
+        // Create a response message - either confirmation or error message
+        let botResponse;
+        
+        if (pillReminder) {
+          // Success case
+          botResponse = `یادآور داروی شما با موفقیت ثبت شد:
+نام دارو: ${pillReminderIntent.name}
+دوز: ${pillReminderIntent.dosage}
+تناوب: ${pillReminderIntent.frequency === 'daily' ? 'روزانه' : 
+               pillReminderIntent.frequency === 'twice_daily' ? 'دو بار در روز' :
+               pillReminderIntent.frequency === 'three_times_daily' ? 'سه بار در روز' :
+               pillReminderIntent.frequency === 'weekly' ? 'هفتگی' :
+               pillReminderIntent.frequency === 'monthly' ? 'ماهانه' : 'در صورت نیاز'}
+زمان: ${timesDisplay}
+${pillReminderIntent.withFood ? 'همراه با غذا' : 'بدون غذا'}
+
+شما می‌توانید این یادآور را در بخش «یادآور دارو» مشاهده و مدیریت کنید.`;
+        } else {
+          // Error case
+          botResponse = `من متوجه شدم که شما می‌خواهید یادآور دارویی برای "${pillReminderIntent.name}" ایجاد کنید.
+دستورالعمل‌های دارویی شما:
+- دوز: ${pillReminderIntent.dosage}
+- تناوب: ${pillReminderIntent.frequency === 'daily' ? 'روزانه' : 
+               pillReminderIntent.frequency === 'twice_daily' ? 'دو بار در روز' :
+               pillReminderIntent.frequency === 'three_times_daily' ? 'سه بار در روز' :
+               pillReminderIntent.frequency === 'weekly' ? 'هفتگی' :
+               pillReminderIntent.frequency === 'monthly' ? 'ماهانه' : 'در صورت نیاز'}
+- زمان: ${timesDisplay}
+${pillReminderIntent.withFood ? '- همراه با غذا' : '- بدون غذا'}
+
+متأسفانه به دلیل خطای فنی، امکان ایجاد یادآور خودکار وجود ندارد. لطفاً به صورت دستی از منوی «یادآور دارو» این یادآور را ایجاد کنید.
+
+خطا: ${error ? (typeof error === 'object' && error !== null && 'message' in error ? error.message : 'خطای نامشخص') : 'خطای اتصال به پایگاه داده'}`;
+        }
+
+        // Save the bot response
+        await prisma.chatMessage.create({
+          data: {
+            text: botResponse,
+            sender: 'bot',
+            userId: messageUserId,
+            conversationId
+          }
+        });
+
+        return NextResponse.json({ 
+          response: botResponse,
+          conversationId,
+          pillReminderCreated: !!pillReminder,
+          pillReminder: pillReminder || null
+        });
+      } catch (error) {
+        // Even if everything else fails, try to send a simple response that won't disappear
+        console.error("Complete error in pill reminder flow:", error);
+        
+        const fallbackResponse = "متوجه شدم که شما درباره دارو صحبت می‌کنید. لطفاً برای ایجاد یادآور دارو از بخش «یادآور دارو» در منو استفاده کنید.";
+        
+        try {
+          // Try to save a fallback message
+          await prisma.chatMessage.create({
+            data: {
+              text: fallbackResponse,
+              sender: 'bot',
+              userId: messageUserId,
+              conversationId
+            }
+          });
+        } catch (saveError) {
+          console.error("Failed to save fallback message:", saveError);
+        }
+        
+        return NextResponse.json({ 
+          response: fallbackResponse,
+          conversationId,
+          pillReminderCreated: false
+        });
+      }
+    }
+
+    // Check for appointment intent
     const appointmentIntent = detectAppointmentIntent(userMessage);
     if (appointmentIntent && userExists && userId) {
       // Save the user message

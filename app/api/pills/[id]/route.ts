@@ -73,7 +73,7 @@ export async function PUT(
     }
 
     // Update pill reminder
-    const updatedPillReminder = await prisma.pillReminder.update({
+    const updatedPillReminder = await (prisma as any).pillReminder.update({
       where: { id: params.id },
       data
     });
@@ -107,7 +107,7 @@ export async function DELETE(
     }
 
     // Delete pill reminder
-    await prisma.pillReminder.delete({
+    await (prisma as any).pillReminder.delete({
       where: { id: params.id }
     });
 

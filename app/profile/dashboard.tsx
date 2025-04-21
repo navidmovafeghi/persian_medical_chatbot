@@ -27,6 +27,18 @@ interface Appointment {
   duration: number;
 }
 
+interface PillReminder {
+  id: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  times: string;
+  startDate: string;
+  endDate?: string;
+  status: string;
+  withFood: boolean;
+}
+
 interface ChatMessage {
   id: string;
   text: string;
@@ -60,6 +72,9 @@ export default function Dashboard() {
   // State for appointments
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   
+  // State for pill reminders
+  const [pillReminders, setPillReminders] = useState<PillReminder[]>([]);
+  
   // State for chat messages
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   
@@ -68,6 +83,7 @@ export default function Dashboard() {
     profile: true,
     appointments: true,
     laboratory: true,
+    pills: true,
     chat: true
   });
   
@@ -76,6 +92,7 @@ export default function Dashboard() {
     profile: '',
     appointments: '',
     laboratory: '',
+    pills: '',
     chat: ''
   });
   
@@ -180,6 +197,33 @@ export default function Dashboard() {
     }
   }, [isAuthenticated]);
   
+  // Fetch pill reminders
+  useEffect(() => {
+    const fetchPillReminders = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await fetch('/api/pills');
+          
+          if (response.ok) {
+            const data = await response.json();
+            setPillReminders(data || []);
+          } else {
+            throw new Error('Failed to fetch pill reminders');
+          }
+        } catch (error) {
+          console.error('Error fetching pill reminders:', error);
+          setErrors(prev => ({ ...prev, pills: 'خطا در دریافت یادآورهای دارو' }));
+        } finally {
+          setLoading(prev => ({ ...prev, pills: false }));
+        }
+      }
+    };
+    
+    if (isAuthenticated) {
+      fetchPillReminders();
+    }
+  }, [isAuthenticated]);
+  
   // Fetch chat messages
   useEffect(() => {
     const fetchChatMessages = async () => {
@@ -253,6 +297,16 @@ export default function Dashboard() {
     appointment => new Date(appointment.dateTime) > new Date() && appointment.status !== 'cancelled'
   );
   
+  // Sort pill reminders by date (most recent first)
+  const sortedPillReminders = [...pillReminders].sort((a, b) => {
+    return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+  });
+  
+  // Get active pill reminders
+  const activePillReminders = sortedPillReminders.filter(
+    pill => pill.status === 'active'
+  );
+  
   // Sort laboratory data by date (most recent first)
   const sortedLabData = [...laboratoryData].sort((a, b) => {
     return new Date(b.testDate).getTime() - new Date(a.testDate).getTime();
@@ -302,6 +356,12 @@ export default function Dashboard() {
             onClick={() => setActiveTab('appointments')}
           >
             قرار ملاقات‌ها
+          </button>
+          <button 
+            className={`${styles.tabButton} ${activeTab === 'pills' ? styles.tabButtonActive : ''}`}
+            onClick={() => setActiveTab('pills')}
+          >
+            یادآور دارو
           </button>
           <button 
             className={`${styles.tabButton} ${activeTab === 'laboratory' ? styles.tabButtonActive : ''}`}
@@ -372,8 +432,8 @@ export default function Dashboard() {
               <span className={styles.cardIcon}>📅</span>
               قرار ملاقات‌های آینده
             </h2>
-            <Link href="/" className={styles.seeAllLink}>
-              چت با پزشک هوشمند ↗
+            <Link href="/appointments" className={styles.seeAllLink}>
+              مدیریت قرار ملاقات‌ها ↗
             </Link>
           </div>
           <div className={styles.cardBody}>
@@ -398,6 +458,48 @@ export default function Dashboard() {
                       📅 {formatDate(appointment.dateTime)}
                     </div>
                     <div>دکتر {appointment.doctorName}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        
+        {/* Active Pill Reminders Card */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h2 className={styles.cardTitle}>
+              <span className={styles.cardIcon}>💊</span>
+              یادآورهای داروی فعال
+            </h2>
+            <Link href="/pills" className={styles.seeAllLink}>
+              مدیریت یادآورهای دارو ↗
+            </Link>
+          </div>
+          <div className={styles.cardBody}>
+            {loading.pills ? (
+              <div className={styles.emptyState}>در حال بارگذاری...</div>
+            ) : errors.pills ? (
+              <div className={styles.emptyState}>{errors.pills}</div>
+            ) : activePillReminders.length === 0 ? (
+              <div className={styles.emptyState}>
+                یادآور داروی فعالی ندارید
+                <br />
+                <Link href="/pills" className={styles.emptyStateButton}>
+                  افزودن یادآور دارو
+                </Link>
+              </div>
+            ) : (
+              <ul className={styles.appointmentList}>
+                {activePillReminders.slice(0, 3).map((pill) => (
+                  <li key={pill.id} className={styles.appointmentItem}>
+                    <div className={styles.appointmentTitle}>{pill.name}</div>
+                    <div className={styles.appointmentDate}>
+                      💊 {pill.dosage} - {pill.frequency}
+                    </div>
+                    <div>
+                      {pill.withFood ? 'همراه با غذا' : 'بدون غذا'} | از {formatDate(pill.startDate)}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -500,8 +602,8 @@ export default function Dashboard() {
               <span className={styles.cardIcon}>📅</span>
               قرار ملاقات‌های پزشکی
             </h2>
-            <Link href="/" className={`${styles.actionButton} ${styles.chatButton}`}>
-              چت با پزشک هوشمند
+            <Link href="/appointments" className={styles.actionButton}>
+              مدیریت قرار ملاقات‌ها
             </Link>
           </div>
           
@@ -536,6 +638,62 @@ export default function Dashboard() {
                     </div>
                     <div>دکتر {appointment.doctorName}</div>
                     <div>وضعیت: {appointment.status}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Pills Tab Content */}
+      <div className={`${styles.tabContent} ${activeTab === 'pills' ? styles.activeTab : ''}`}>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h2 className={styles.cardTitle}>
+              <span className={styles.cardIcon}>💊</span>
+              یادآورهای دارو
+            </h2>
+            <Link href="/pills" className={styles.actionButton}>
+              مدیریت یادآورهای دارو
+            </Link>
+          </div>
+          
+          <div className={styles.appointmentManagement}>
+            <div className={styles.appointmentManagementContent}>
+              <h3>مدیریت یادآورهای دارو</h3>
+              <p>در این بخش می‌توانید یادآورهای دارویی خود را مشاهده کنید.</p>
+            </div>
+          </div>
+          
+          <div className={styles.cardBody}>
+            {loading.pills ? (
+              <div className={styles.emptyState}>در حال بارگذاری...</div>
+            ) : errors.pills ? (
+              <div className={styles.emptyState}>{errors.pills}</div>
+            ) : sortedPillReminders.length === 0 ? (
+              <div className={styles.emptyState}>
+                یادآور دارویی ثبت نشده است
+                <br />
+                <Link href="/pills" className={styles.emptyStateButton}>
+                  افزودن یادآور دارو
+                </Link>
+              </div>
+            ) : (
+              <ul className={styles.appointmentList}>
+                {sortedPillReminders.map((pill) => (
+                  <li key={pill.id} className={styles.appointmentItem}>
+                    <div className={styles.appointmentTitle}>{pill.name}</div>
+                    <div className={styles.appointmentDate}>
+                      💊 {pill.dosage} - {pill.frequency}
+                    </div>
+                    <div>
+                      {pill.withFood ? 'همراه با غذا' : 'بدون غذا'} | از {formatDate(pill.startDate)}
+                      {pill.endDate && ` تا ${formatDate(pill.endDate)}`}
+                    </div>
+                    <div>وضعیت: {pill.status === 'active' ? 'فعال' : 
+                               pill.status === 'completed' ? 'تمام شده' :
+                               pill.status === 'paused' ? 'موقتاً متوقف' : 'لغو شده'}</div>
                   </li>
                 ))}
               </ul>
@@ -632,6 +790,9 @@ export default function Dashboard() {
       <div className={profileStyles.backLink}>
         <Link href="/" className={`${profileStyles.appointmentLink} ${profileStyles.appointmentLinkHighlight}`}>
           چت با پزشک هوشمند
+        </Link>
+        <Link href="/pills" className={profileStyles.appointmentLink}>
+          مدیریت یادآورهای دارو
         </Link>
         <Link href="/profile/edit" className={profileStyles.appointmentLink}>
           ویرایش اطلاعات پروفایل

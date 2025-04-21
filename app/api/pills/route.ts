@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     }
 
     // Get pill reminders
-    const pillReminders = await prisma.pillReminder.findMany({
+    const pillReminders = await (prisma as any).pillReminder.findMany({
       where,
       orderBy: { startDate: 'asc' }
     });
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     }
 
     // Create pill reminder
-    const pillReminder = await prisma.pillReminder.create({
+    const pillReminder = await (prisma as any).pillReminder.create({
       data: {
         ...data,
         userId
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
 // Utility function to check if user has permission to access the pill reminder
 export async function checkPillReminderAccess(pillReminderId: string, userId: string) {
-  const pillReminder = await prisma.pillReminder.findUnique({
+  const pillReminder = await (prisma as any).pillReminder.findUnique({
     where: { id: pillReminderId }
   });
 
