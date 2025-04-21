@@ -1,371 +1,328 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 import styles from '../profile/profile.module.css';
+import { createTesseractWorker } from '../tesseract-preload';
 
-interface TestResult {
+interface ExtractedData {
   testName: string;
-  testDate: string;
-  result: string;
-  unit?: string;
-  normalRange?: string;
-  notes?: string;
+  value: string;
+  unit: string;
+  normalRange: string;
+  date?: string;
+  labName?: string;
 }
 
 interface LabResultUploadProps {
-  onDataExtracted: (data: TestResult[]) => void;
+  onDataExtracted: (data: ExtractedData[] | ExtractedData) => void;
   onCancel: () => void;
 }
 
-export default function LabResultUpload({ onDataExtracted, onCancel }: LabResultUploadProps) {
+const LabResultUpload: React.FC<LabResultUploadProps> = ({ onDataExtracted, onCancel }) => {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [extractedData, setExtractedData] = useState<TestResult[]>([]);
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [currentTestIndex, setCurrentTestIndex] = useState(0);
-  
-  // State for keeping track of test results with ability to edit
-  const [reviewData, setReviewData] = useState<TestResult[]>([{
-    testName: '',
-    testDate: '',
-    result: '',
-    unit: '',
-    normalRange: '',
-    notes: '',
-  }]);
+  const [isProcessingLocally, setIsProcessingLocally] = useState(false);
+  const [extractedResults, setExtractedResults] = useState<ExtractedData[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setUploadError(null);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] || null;
+    setFile(selectedFile);
+    setUploadError(null);
+    setExtractedResults([]);
+    setCurrentResultIndex(0);
+    setProcessingStatus('');
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setUploadError(null);
+    setExtractedResults([]);
+    setCurrentResultIndex(0);
+    setProcessingStatus('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const parseExtractedText = (text: string): ExtractedData[] => {
+    console.log('Parsing extracted text:', text);
     
-    if (!file) {
-      setUploadError('لطفا ابتدا یک فایل انتخاب کنید');
-      return;
-    }
-
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      setUploadError('فقط فایل‌های PDF، JPG و PNG پشتیبانی می‌شوند');
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadError(null);
+    // Simple pattern matching for test name, value, unit, and reference range
+    const results: ExtractedData[] = [];
     
-    try {
-      console.log(`[CLIENT] Uploading file: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    // Split text by lines to process each line
+    const lines = text.split('\n');
+    
+    let currentTest: Partial<ExtractedData> = {};
+    
+    for (const line of lines) {
+      // Skip empty lines
+      if (!line.trim()) continue;
       
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/laboratory/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('[CLIENT] Upload error response:', data);
-        let errorMessage = data.error || 'خطا در پردازش فایل';
-        
-        // Add detailed error information if available
-        if (data.stage && data.details) {
-          console.error(`[CLIENT] Error in stage "${data.stage}": ${data.details}`);
-          errorMessage = `${errorMessage} - مرحله: ${data.stage} - ${data.details}`;
+      // Check for test name pattern (typically starts with alphabetic characters)
+      if (/[a-zA-Z\u0600-\u06FF]{2,}/.test(line) && !line.includes(':')) {
+        // If we have a partial test record, save it before starting a new one
+        if (currentTest.testName) {
+          results.push({
+            testName: currentTest.testName || 'Unknown Test',
+            value: currentTest.value || '',
+            unit: currentTest.unit || '',
+            normalRange: currentTest.normalRange || '',
+            date: new Date().toISOString().split('T')[0],
+            labName: 'Extracted from file'
+          });
         }
         
-        throw new Error(errorMessage);
+        // Start a new test
+        currentTest = { testName: line.trim() };
       }
       
-      console.log('[CLIENT] Upload successful, data:', data);
-      
-      // Ensure data.extractedData is an array
-      const extractedResults = Array.isArray(data.extractedData) ? data.extractedData : [data.extractedData];
-      
-      console.log(`[CLIENT] Found ${extractedResults.length} test results`);
-      
-      // If we have no results, create a default empty one
-      if (extractedResults.length === 0) {
-        extractedResults.push({
-          testName: file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-          testDate: new Date().toISOString().split('T')[0],
-          result: '',
-          unit: '',
-          normalRange: '',
-          notes: 'Please enter test results manually.',
-        });
+      // Check for value pattern (typically numeric)
+      else if (/[0-9]/.test(line) && !currentTest.value) {
+        currentTest.value = line.trim();
       }
       
-      // Set the extracted data for review
-      setExtractedData(extractedResults);
-      setReviewData(extractedResults);
-      setCurrentTestIndex(0);
-      setIsReviewing(true);
-    } catch (error) {
-      console.error('[CLIENT] Upload error:', error);
-      setUploadError(error instanceof Error ? error.message : 'خطا در آپلود فایل');
-    } finally {
-      setIsUploading(false);
+      // Check for unit pattern (typically short text after value)
+      else if (!currentTest.unit && currentTest.value) {
+        currentTest.unit = line.trim();
+      }
+      
+      // Check for reference range pattern
+      else if (!currentTest.normalRange && line.toLowerCase().includes('normal') || 
+               line.includes('reference') || 
+               line.includes('range') || 
+               line.includes('مرجع') || 
+               line.includes('نرمال')) {
+        currentTest.normalRange = line.trim();
+      }
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
     
-    setReviewData(prev => {
-      const updated = [...prev];
-      updated[currentTestIndex] = {
-        ...updated[currentTestIndex],
-        [name]: value
-      };
-      return updated;
-    });
-  };
-
-  const handleNextTest = () => {
-    if (currentTestIndex < reviewData.length - 1) {
-      setCurrentTestIndex(prev => prev + 1);
+    // Don't forget to add the last test if it exists
+    if (currentTest.testName) {
+      results.push({
+        testName: currentTest.testName || 'Unknown Test',
+        value: currentTest.value || '',
+        unit: currentTest.unit || '',
+        normalRange: currentTest.normalRange || '',
+        date: new Date().toISOString().split('T')[0],
+        labName: 'Extracted from file'
+      });
     }
-  };
-
-  const handlePrevTest = () => {
-    if (currentTestIndex > 0) {
-      setCurrentTestIndex(prev => prev - 1);
-    }
-  };
-
-  const handleAddTest = () => {
-    setReviewData(prev => [
-      ...prev,
-      {
-        testName: '',
-        testDate: new Date().toISOString().split('T')[0],
-        result: '',
+    
+    // If no structured data was found but we have text, create a single result
+    if (results.length === 0 && text.trim()) {
+      results.push({
+        testName: 'Extracted Text',
+        value: '',
         unit: '',
-        normalRange: '',
-        notes: '',
-      }
-    ]);
-    setCurrentTestIndex(reviewData.length);
-  };
-
-  const handleDeleteTest = () => {
-    if (reviewData.length <= 1) {
-      return; // Don't delete the last test
+        normalRange: text.trim(),
+        date: new Date().toISOString().split('T')[0],
+        labName: 'Extracted from file'
+      });
     }
     
-    setReviewData(prev => {
-      const updated = prev.filter((_, index) => index !== currentTestIndex);
-      return updated;
-    });
-    
-    setCurrentTestIndex(prev => {
-      if (prev >= reviewData.length - 1) {
-        return reviewData.length - 2;
-      }
-      return prev;
-    });
+    console.log('Parsed results:', results);
+    return results;
   };
 
-  const handleConfirm = () => {
-    // Pass the confirmed data to the parent component
-    onDataExtracted(reviewData);
+  const processFileLocally = async (file: File) => {
+    if (!file) return;
+    
+    setIsProcessingLocally(true);
+    setProcessingStatus('Initializing OCR engine...');
+    
+    try {
+      const worker = await createTesseractWorker('fas', (m) => {
+        if (m.status === 'recognizing text') {
+          setProcessingStatus(`Processing: ${Math.floor(m.progress * 100)}%`);
+        } else {
+          setProcessingStatus(`${m.status}...`);
+        }
+      });
+      
+      setProcessingStatus('Reading file...');
+      
+      // Get file as base64
+      const reader = new FileReader();
+      const fileDataPromise = new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      
+      const fileData = await fileDataPromise;
+      
+      setProcessingStatus('Recognizing text...');
+      const { data } = await worker.recognize(fileData);
+      
+      setProcessingStatus('Analyzing results...');
+      const extractedData = parseExtractedText(data.text);
+      setExtractedResults(extractedData);
+      
+      setProcessingStatus('Processing complete!');
+      toast.success('استخراج اطلاعات با موفقیت انجام شد');
+      await worker.terminate();
+    } catch (error) {
+      console.error('Error processing file locally:', error);
+      setUploadError(`Error processing file: ${error instanceof Error ? error.message : String(error)}`);
+      setProcessingStatus('');
+      toast.error('خطا در پردازش فایل');
+    } finally {
+      setIsProcessingLocally(false);
+    }
+  };
+
+  const submitExtractedResults = () => {
+    if (extractedResults.length === 0) {
+      setUploadError('اطلاعاتی از فایل استخراج نشد');
+      toast.error('اطلاعاتی از فایل استخراج نشد');
+      return;
+    }
+    
+    try {
+      // If multiple results, pass the whole array
+      if (extractedResults.length > 1) {
+        onDataExtracted(extractedResults);
+        toast.success(`${extractedResults.length} نتیجه استخراج شد`);
+      } else {
+        // If single result, pass just that result
+        onDataExtracted(extractedResults[0]);
+        toast.success('نتیجه با موفقیت استخراج شد');
+      }
+    } catch (error) {
+      console.error('Error submitting results:', error);
+      setUploadError(`خطا در ارسال نتایج: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error('خطا در ارسال نتایج');
+    }
+  };
+  
+  // Process file when selected
+  useEffect(() => {
+    if (file) {
+      processFileLocally(file);
+    }
+  }, [file]);
+
+  // Add a new function to handle result previewing and navigation
+  const handleNavigation = (direction: 'next' | 'prev') => {
+    if (direction === 'next' && currentResultIndex < extractedResults.length - 1) {
+      setCurrentResultIndex(currentResultIndex + 1);
+    } else if (direction === 'prev' && currentResultIndex > 0) {
+      setCurrentResultIndex(currentResultIndex - 1);
+    }
+  };
+
+  // Add a function to validate the test results before submission
+  const validateResults = (): boolean => {
+    // Ensure we have at least one test result with required fields
+    if (extractedResults.length === 0) {
+      return false;
+    }
+    
+    // Check if at least one result has required fields
+    return extractedResults.some(result => 
+      !!result.testName && (!!result.value || result.value === '0')
+    );
   };
 
   return (
-    <div className={styles.labForm}>
-      <h3>آپلود نتیجه آزمایش</h3>
+    <div className={styles.formSection}>
+      <h3>آپلود نتایج آزمایش</h3>
       
-      {!isReviewing ? (
-        <form onSubmit={handleUpload}>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>
-              فایل آزمایش (PDF یا تصویر)
-            </label>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              accept=".pdf,.jpg,.jpeg,.png"
-              className={styles.input}
-            />
-            <p className={styles.uploadHint}>
-              می‌توانید فایل PDF یا تصویر نتیجه آزمایش خود را آپلود کنید. سیستم به صورت خودکار اطلاعات را استخراج خواهد کرد.
-            </p>
-          </div>
-          
-          {uploadError && (
-            <div className={styles.errorMessage}>{uploadError}</div>
-          )}
-          
-          <div className={styles.buttonGroup}>
-            <button
-              type="submit"
-              className={styles.saveButton}
-              disabled={isUploading}
-            >
-              {isUploading ? 'در حال پردازش...' : 'آپلود و پردازش'}
-            </button>
-            <button
-              type="button"
-              className={styles.cancelButton}
-              onClick={onCancel}
-              disabled={isUploading}
-            >
-              انصراف
-            </button>
-          </div>
-        </form>
-      ) : (
-        <div className={styles.reviewForm}>
-          <p className={styles.reviewMessage}>
-            {reviewData.length > 1 
-              ? `لطفا اطلاعات استخراج شده را بررسی و در صورت نیاز ویرایش کنید (آزمایش ${currentTestIndex + 1} از ${reviewData.length}):` 
-              : 'لطفا اطلاعات استخراج شده را بررسی و در صورت نیاز ویرایش کنید:'}
-          </p>
-          
-          {/* Test navigation buttons (if multiple tests) */}
-          {reviewData.length > 1 && (
-            <div className={styles.testNavigation}>
-              <button 
-                type="button" 
-                onClick={handlePrevTest} 
-                disabled={currentTestIndex === 0}
-                className={styles.navButton}
-              >
-                آزمایش قبلی
-              </button>
-              <span className={styles.testCounter}>
-                {currentTestIndex + 1} / {reviewData.length}
-              </span>
-              <button 
-                type="button" 
-                onClick={handleNextTest} 
-                disabled={currentTestIndex === reviewData.length - 1}
-                className={styles.navButton}
-              >
-                آزمایش بعدی
-              </button>
-            </div>
-          )}
-          
-          {/* Form fields for the current test */}
-          <div className={styles.formGroup}>
-            <label htmlFor="testName" className={styles.label}>نام آزمایش</label>
-            <input
-              id="testName"
-              name="testName"
-              type="text"
-              value={reviewData[currentTestIndex].testName}
-              onChange={handleInputChange}
-              className={styles.input}
-              required
-            />
-          </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="testDate" className={styles.label}>تاریخ آزمایش</label>
-            <input
-              id="testDate"
-              name="testDate"
-              type="date"
-              value={reviewData[currentTestIndex].testDate}
-              onChange={handleInputChange}
-              className={styles.input}
-              required
-            />
-          </div>
-          
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="result" className={styles.label}>نتیجه</label>
-              <input
-                id="result"
-                name="result"
-                type="text"
-                value={reviewData[currentTestIndex].result}
-                onChange={handleInputChange}
-                className={styles.input}
-                required
-              />
-            </div>
-            
-            <div className={styles.formGroup}>
-              <label htmlFor="unit" className={styles.label}>واحد (اختیاری)</label>
-              <input
-                id="unit"
-                name="unit"
-                type="text"
-                value={reviewData[currentTestIndex].unit}
-                onChange={handleInputChange}
-                className={styles.input}
-              />
-            </div>
-          </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="normalRange" className={styles.label}>محدوده نرمال (اختیاری)</label>
-            <input
-              id="normalRange"
-              name="normalRange"
-              type="text"
-              value={reviewData[currentTestIndex].normalRange}
-              onChange={handleInputChange}
-              className={styles.input}
-            />
-          </div>
-          
-          <div className={styles.formGroup}>
-            <label htmlFor="notes" className={styles.label}>توضیحات (اختیاری)</label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={reviewData[currentTestIndex].notes}
-              onChange={handleInputChange}
-              className={styles.textarea}
-            ></textarea>
-          </div>
-          
-          {/* Test management buttons */}
-          <div className={styles.testManagement}>
+      <div className={styles.formGroup}>
+        <label htmlFor="lab-file">انتخاب فایل PDF یا تصویر آزمایش:</label>
+        <input
+          type="file"
+          id="lab-file"
+          ref={fileInputRef}
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleFileChange}
+          disabled={isUploading || isProcessingLocally}
+          className={styles.fileInput}
+        />
+        
+        {file && (
+          <div className={styles.fileInfo}>
+            <p>فایل انتخاب شده: {file.name}</p>
             <button 
               type="button" 
-              onClick={handleAddTest}
-              className={styles.addTestButton}
+              onClick={clearFile}
+              className={styles.clearButton}
+              disabled={isUploading || isProcessingLocally}
             >
-              افزودن آزمایش دیگر
+              پاک کردن
             </button>
-            
-            {reviewData.length > 1 && (
+          </div>
+        )}
+      </div>
+      
+      {processingStatus && (
+        <div className={styles.statusMessage}>
+          <p>{processingStatus}</p>
+        </div>
+      )}
+      
+      {uploadError && (
+        <div className={styles.errorMessage}>
+          <p>{uploadError}</p>
+        </div>
+      )}
+      
+      {extractedResults.length > 0 && (
+        <div className={styles.extractedData}>
+          <h4>اطلاعات استخراج شده:</h4>
+          
+          {extractedResults.length > 1 && (
+            <div className={styles.testNavigation}>
               <button 
-                type="button" 
-                onClick={handleDeleteTest}
-                className={styles.deleteTestButton}
+                onClick={() => handleNavigation('prev')}
+                disabled={currentResultIndex === 0}
+                className={styles.navButton}
               >
-                حذف این آزمایش
+                قبلی
               </button>
-            )}
+              
+              <span className={styles.testCounter}>
+                {currentResultIndex + 1} از {extractedResults.length}
+              </span>
+              
+              <button 
+                onClick={() => handleNavigation('next')}
+                disabled={currentResultIndex === extractedResults.length - 1}
+                className={styles.navButton}
+              >
+                بعدی
+              </button>
+            </div>
+          )}
+          
+          <div className={styles.resultPreview}>
+            <p><strong>نام آزمایش:</strong> {extractedResults[currentResultIndex].testName}</p>
+            <p><strong>مقدار:</strong> {extractedResults[currentResultIndex].value}</p>
+            <p><strong>واحد:</strong> {extractedResults[currentResultIndex].unit}</p>
+            <p><strong>محدوده مرجع:</strong> {extractedResults[currentResultIndex].normalRange}</p>
           </div>
           
-          <div className={styles.buttonGroup}>
+          <div className={styles.formActions}>
             <button
               type="button"
-              className={styles.saveButton}
-              onClick={handleConfirm}
+              onClick={submitExtractedResults}
+              disabled={isProcessingLocally || !validateResults()}
+              className={styles.submitButton}
             >
-              ذخیره همه اطلاعات
+              {extractedResults.length > 1 ? `ذخیره ${extractedResults.length} نتیجه آزمایش` : 'ذخیره نتیجه آزمایش'}
             </button>
+            
             <button
               type="button"
-              className={styles.cancelButton}
               onClick={onCancel}
+              className={styles.cancelButton}
             >
               انصراف
             </button>
@@ -374,4 +331,6 @@ export default function LabResultUpload({ onDataExtracted, onCancel }: LabResult
       )}
     </div>
   );
-} 
+};
+
+export default LabResultUpload; 

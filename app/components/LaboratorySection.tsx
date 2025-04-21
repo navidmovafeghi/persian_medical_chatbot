@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import LabResultUpload from './LabResultUpload';
 import styles from '../profile/profile.module.css';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 // Laboratory data interface
 interface LaboratoryData {
@@ -16,6 +18,15 @@ interface LaboratoryData {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+interface ExtractedData {
+  testName: string;
+  value: string;
+  unit?: string;
+  normalRange?: string;
+  date?: string;
+  labName?: string;
 }
 
 export default function LaboratorySection() {
@@ -39,6 +50,8 @@ export default function LaboratorySection() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Fetch laboratory data
   useEffect(() => {
@@ -161,39 +174,54 @@ export default function LaboratorySection() {
   };
   
   // Handle the extracted data from OCR
-  const handleExtractedData = async (extractedData: any[] | any) => {
-    console.log('[CLIENT] Received test results:', extractedData);
+  const handleExtractedData = async (extractedData: ExtractedData[] | ExtractedData | any) => {
+    setIsUploading(false);
     
-    // If no data was extracted, show error
-    if (!extractedData || (Array.isArray(extractedData) && extractedData.length === 0)) {
+    // Handle empty results
+    if (!extractedData || 
+        (Array.isArray(extractedData) && extractedData.length === 0) ||
+        (!Array.isArray(extractedData) && Object.keys(extractedData).length === 0)) {
       setSubmitError('هیچ اطلاعاتی از فایل استخراج نشد');
+      toast.error('داده‌ای استخراج نشد');
       return;
     }
     
-    // If we have multiple test results, save them one by one
-    if (Array.isArray(extractedData) && extractedData.length > 0) {
+    // If extractedData is an array (multiple results)
+    if (Array.isArray(extractedData)) {
+      console.log('Processing multiple extracted results:', extractedData);
+      
+      // Save each result one by one
       setSubmitting(true);
       setSubmitError(null);
       
       try {
-        // Save each test result
-        for (const testResult of extractedData) {
-          // Skip empty results
-          if (!testResult.testName || !testResult.testDate) {
-            continue;
-          }
-          
-          const response = await fetch('/api/laboratory', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(testResult),
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to save laboratory data');
+        let savedCount = 0;
+        
+        for (const result of extractedData) {
+          if (result.testName && result.value) {
+            // Format the data according to your API requirements
+            const testData = {
+              testName: result.testName,
+              testDate: result.date || new Date().toISOString().split('T')[0],
+              result: result.value, // Use value field from extracted data
+              unit: result.unit || '',
+              normalRange: result.normalRange || '',
+              notes: result.labName ? `Lab: ${result.labName}` : '',
+            };
+            
+            const response = await fetch('/api/laboratory', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(testData),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Failed to save: ${response.statusText}`);
+            }
+            
+            savedCount++;
           }
         }
         
@@ -211,31 +239,43 @@ export default function LaboratorySection() {
           notes: '',
         });
         
+        // Show success message
+        toast.success(`${savedCount} نتیجه با موفقیت ذخیره شد`);
+        
         // Refresh laboratory data
         const refreshResponse = await fetch('/api/laboratory');
         const refreshData = await refreshResponse.json();
         setLaboratoryData(refreshData.laboratoryData || []);
-      } catch (error) {
+        
+      } catch (error: any) {
         console.error('Error saving laboratory data:', error);
         setSubmitError(error instanceof Error ? error.message : 'خطا در ذخیره اطلاعات آزمایشگاهی');
+        toast.error(`خطا در ذخیره نتایج: ${error.message || 'خطای نامشخص'}`);
       } finally {
         setSubmitting(false);
       }
     } else {
       // Handle single result (backward compatibility)
       const singleResult = extractedData as any; // Cast to any for backward compatibility
-      setFormData({
-        testName: singleResult.testName || '',
-        testDate: singleResult.testDate || new Date().toISOString().split('T')[0],
-        result: singleResult.result || '',
-        unit: singleResult.unit || '',
-        normalRange: singleResult.normalRange || '',
-        notes: singleResult.notes || '',
-      });
       
-      // Toggle forms
-      setShowUploadForm(false);
-      setShowForm(true);
+      if (singleResult.testName && (singleResult.value || singleResult.testValue)) {
+        setFormData({
+          testName: singleResult.testName || '',
+          testDate: singleResult.date || singleResult.testDate || new Date().toISOString().split('T')[0],
+          result: singleResult.value || singleResult.testValue || '',
+          unit: singleResult.unit || singleResult.testUnit || '',
+          normalRange: singleResult.normalRange || singleResult.referenceRange || '',
+          notes: singleResult.labName ? `Lab: ${singleResult.labName}` : '',
+        });
+        
+        // Toggle forms
+        setShowUploadForm(false);
+        setShowForm(true);
+        toast.success('اطلاعات استخراج شده با موفقیت دریافت شد');
+      } else {
+        setSubmitError('داده های آزمایش ناقص است');
+        toast.error('داده های آزمایش ناقص است');
+      }
     }
   };
   
@@ -280,10 +320,21 @@ export default function LaboratorySection() {
       
       {/* Upload Form */}
       {showUploadForm && (
-        <LabResultUpload
-          onDataExtracted={handleExtractedData}
-          onCancel={() => setShowUploadForm(false)}
-        />
+        <div className={styles.modalBackdrop}>
+          <div className={styles.modalContent}>
+            <button 
+              onClick={() => setShowUploadForm(false)}
+              className={styles.closeButton}
+            >
+              ✕
+            </button>
+            <h3>آپلود نتیجه آزمایش</h3>
+            <LabResultUpload 
+              onDataExtracted={handleExtractedData} 
+              onCancel={() => setShowUploadForm(false)}
+            />
+          </div>
+        </div>
       )}
       
       {/* Manual Form */}
