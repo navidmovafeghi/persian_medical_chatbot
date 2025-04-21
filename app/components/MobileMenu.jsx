@@ -184,6 +184,10 @@ export default function MobileMenu({ onQuestionClick }) {
                 <Link href="/appointments" className={styles.navLink} onClick={toggleMenu}>
                   قرار ملاقات‌ها
                 </Link>
+                
+                <Link href="/pills" className={styles.navLink} onClick={toggleMenu}>
+                  یادآور دارو
+                </Link>
               </>
             )}
           </div>

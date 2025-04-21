@@ -57,6 +57,7 @@ model User {
   chatMessages  ChatMessage[] // One-to-many relation with ChatMessage model
   appointments  Appointment[] // One-to-many relation with Appointment model
   laboratoryData LaboratoryData[] // One-to-many relation with LaboratoryData model
+  pillReminders PillReminder[] // One-to-many relation with PillReminder model
 }
 
 model VerificationToken {
@@ -128,6 +129,38 @@ model Appointment {
   
   @@index([userId])
   @@index([dateTime])
+}
+
+// PillReminder model for medication reminders
+model PillReminder {
+  id            String   @id @default(cuid())
+  name          String   // Medication name
+  dosage        String   // Dosage (e.g., "10mg", "1 pill")
+  frequency     String   // How often to take (e.g., "daily", "twice daily", "weekly")
+  times         String   // JSON string containing times of day to take pill (e.g., ["08:00", "20:00"])
+  startDate     DateTime // When to start taking medication
+  endDate       DateTime? // When to stop taking medication (optional for ongoing medications)
+  withFood      Boolean  @default(false) // Whether medication should be taken with food
+  notes         String?  // Additional instructions or notes
+  reminderSent  Boolean  @default(false) // Whether reminder has been sent for current interval
+  reminded      DateTime? // When the last reminder was sent
+  
+  // Reminder settings
+  remindBefore  Int      @default(15) // Minutes before scheduled time to send reminder
+  
+  // Status: 'active', 'completed', 'paused', 'cancelled'
+  status        String   @default("active")
+  
+  // Link to user
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([startDate])
+  @@index([status])
 }
 
 // Laboratory data model to store test results
