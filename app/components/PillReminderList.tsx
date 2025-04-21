@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from '../appointments/appointments.module.css';
+import styles from '../pills/pills.module.css';
 
 // Define the PillReminder interface
 interface PillReminder {
