@@ -60,6 +60,7 @@ export const authOptions: AuthOptions = {
   ],
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/auth/signin",
@@ -67,17 +68,29 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async session({ session, token }) {
-      if (session.user && token) {
+      console.log("Session callback received:", { session, token });
+      
+      if (session?.user && token) {
         session.user.id = token.id as string;
+        
+        // Log the modified session
+        console.log("Session callback returning:", session);
       }
       return session;
     },
     async jwt({ token, user }) {
+      console.log("JWT callback received:", { token, user });
+      
       if (user) {
         token.id = user.id;
       }
+      
+      // Log the modified token
+      console.log("JWT callback returning:", token);
+      
       return token;
     }
   },
+  debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
 }; 

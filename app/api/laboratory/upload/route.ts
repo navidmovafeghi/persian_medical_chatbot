@@ -5,10 +5,26 @@ import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { existsSync } from 'fs';
+import { tesseractWorkerOptions } from '../../../tesseract-preload';
+import { PrismaClient } from '@prisma/client';
+import PDFParser from 'pdf-parse';
+import { createTesseractWorker } from '../../../tesseract-preload';
+
+const prisma = new PrismaClient();
 
 // Conditional imports for local development
 let Tesseract: any;
 let pdfjsLib: any;
+
+const isNetlify = process.env.NETLIFY === 'true';
+const isLocalDev = process.env.NODE_ENV === 'development';
+
+// Use /tmp directory in serverless environments, local directory otherwise
+const getBaseUploadDir = () => {
+  return isNetlify ? '/tmp/uploads' : join(process.cwd(), 'uploads');
+};
 
 // Function to extract text from images using Tesseract.js (OCR)
 async function extractTextFromImage(filePath: string): Promise<string> {
@@ -32,24 +48,46 @@ async function extractTextFromImage(filePath: string): Promise<string> {
     
     console.log(`[OCR] File verified, starting Tesseract recognition`);
     
-    // Configure Tesseract worker and logging
-    const { data: { text } } = await Tesseract.recognize(
-      filePath,
-      'eng+far', // English + Persian language
-      {
-        logger: (m: any) => {
-          if (m.status === 'recognizing text') {
-            console.log(`[OCR] Recognition progress: ${Math.floor(m.progress * 100)}%`);
-          } else {
-            console.log(`[OCR] Status: ${m.status}`);
-          }
+    // Use worker with CDN path to avoid path resolving issues
+    const { createWorker } = Tesseract;
+    const worker = await createWorker({
+      // Use a CDN path for the worker
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+      logger: (m: any) => {
+        if (m.status === 'recognizing text') {
+          console.log(`[OCR] Recognition progress: ${Math.floor(m.progress * 100)}%`);
+        } else {
+          console.log(`[OCR] Status: ${m.status}`);
         }
       }
-    );
+    });
     
-    // Log a sample of the extracted text (first 100 chars)
-    const textSample = text.substring(0, 100).replace(/\n/g, ' ');
+    // Initialize worker with correct languages
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    console.log('[OCR] Worker initialized with English language');
+    
+    // Recognize the image
+    const { data } = await worker.recognize(filePath);
+    const text = data.text;
+    
+    // Terminate the worker
+    await worker.terminate();
+    
+    // Log a sample of the extracted text (first 200 chars)
+    const textSample = text.substring(0, 200).replace(/\n/g, ' ');
     console.log(`[OCR] Extraction complete. Text sample: "${textSample}..."`);
+    console.log(`[OCR] Total text length: ${text.length} characters`);
+    
+    // Log the first 20 lines for debugging
+    const lines = text.split('\n');
+    console.log(`[OCR] Extracted ${lines.length} lines of text`);
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      const line = lines[i].trim();
+      if (line) {
+        console.log(`[OCR] Line ${i}: "${line}"`);
+      }
+    }
     
     return text;
   } catch (error) {
@@ -111,125 +149,217 @@ async function extractTextFromPDF(filePath: string): Promise<string> {
 }
 
 // Function to parse the extracted text to structured data
-function parseLabResults(text: string) {
-  // Extract common metadata
-  // Extract date
-  const dateMatch = text.match(/Date:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{2}\/[0-9]{2}\/[0-9]{4})/);
-  const testDate = dateMatch ? dateMatch[1].trim() : new Date().toISOString().split('T')[0];
-  
-  // Initialize an array to hold all test results
+function parseLabResults(text: string): any[] {
   const testResults = [];
+  console.log('[PARSER] Starting to parse extracted text');
+  console.log('[PARSER] Text length:', text.length);
   
-  // Try to find blood cell count tests
-  const cbcTests = [
-    { name: 'WBC', regex: /White\s*Blood\s*Cells?|WBC|Leukocytes?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'RBC', regex: /Red\s*Blood\s*Cells?|RBC|Erythrocytes?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Hemoglobin', regex: /Hemoglobin[\s\(Hgb\)]*[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Hematocrit', regex: /Hematocrit[\s\(Hct\)]*[\s\:]*([0-9\.]+)\s*([a-zA-Z\/\%]+)/ },
-    { name: 'Platelets', regex: /Platelets?[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
+  // Replace multiple spaces with single space to normalize text
+  const normalizedText = text.replace(/\s+/g, ' ');
+  console.log('[PARSER] Normalized text (first 200 chars):', normalizedText.substring(0, 200));
+  
+  // Split by newlines or potential test boundaries
+  const lines = text.split(/\n|\r/);
+  console.log('[PARSER] Split into', lines.length, 'lines');
+  
+  const defaultDate = new Date().toISOString().split('T')[0]; // Fallback date
+
+  // Common lab test abbreviations to specifically look for
+  // Expanded to include more common lab tests
+  const commonLabTests = [
+    'eGFR', 'CRE', 'BUN', 'Na', 'K', 'Cl', 'CO2', 'Cys-C', 'AST', 'ALT', 'ALP', 
+    'GGT', 'T-BIL', 'HbA1c', 'WBC', 'RBC', 'HGB', 'HCT', 'PLT', 'TSH', 'CK', 'SEG', 'ST',
+    'HDL', 'LDL', 'TC', 'TG', 'CRP', 'ESR', 'Ca', 'Mg', 'P', 'Glu', 'Cr', 'MCH', 'MCHC', 'MCV',
+    'T3', 'T4', 'FSH', 'LH'
   ];
   
-  // Check for each CBC test
-  cbcTests.forEach(test => {
-    const match = text.match(test.regex);
-    if (match) {
-      testResults.push({
-        testName: test.name,
-        testDate: testDate,
-        result: match[1],
-        unit: match[2] || '',
-        normalRange: '',
-        notes: 'Extracted from uploaded file'
-      });
+  // Log each line for debugging
+  lines.forEach((line, index) => {
+    const trimmedLine = line.trim();
+    if (trimmedLine) {
+      console.log(`[PARSER] Line ${index}: "${trimmedLine}"`);
     }
   });
   
-  // Try to find blood chemistry tests
-  const chemistryTests = [
-    { name: 'Glucose', regex: /Glucose|Blood\s*Sugar[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Cholesterol', regex: /Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Triglycerides', regex: /Triglycerides[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'HDL', regex: /HDL[\s\-]*Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'LDL', regex: /LDL[\s\-]*Cholesterol[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
-  ];
+  const allTests = [];
   
-  // Check for each chemistry test
-  chemistryTests.forEach(test => {
-    const match = text.match(test.regex);
-    if (match) {
-      testResults.push({
-        testName: test.name,
-        testDate: testDate,
-        result: match[1],
-        unit: match[2] || '',
-        normalRange: '',
-        notes: 'Extracted from uploaded file'
-      });
-    }
-  });
+  // Special pattern for exact format in user's image: "TEST_NAME VALUE [H/L] (DATE)"
+  // This will match formats like: "eGFR 37.7 (Apr 1)" or "CRE 1.61 H (Apr 1)"
+  const specialPattern = /^\s*([A-Za-z0-9\-\.]{1,10})\s+([\d\.]+|\*+)\s*([HL])?\s*\(([^\)]+)\)/;
   
-  // Try to find liver function tests
-  const liverTests = [
-    { name: 'AST', regex: /AST|SGOT[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'ALT', regex: /ALT|SGPT[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'ALP', regex: /Alkaline\s*Phosphatase|ALP[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Bilirubin', regex: /Bilirubin[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
-  ];
-  
-  // Check for each liver test
-  liverTests.forEach(test => {
-    const match = text.match(test.regex);
-    if (match) {
-      testResults.push({
-        testName: test.name,
-        testDate: testDate,
-        result: match[1],
-        unit: match[2] || '',
-        normalRange: '',
-        notes: 'Extracted from uploaded file'
-      });
-    }
-  });
-  
-  // Try to find kidney function tests
-  const kidneyTests = [
-    { name: 'Creatinine', regex: /Creatinine[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'BUN', regex: /BUN|Blood\s*Urea\s*Nitrogen[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ },
-    { name: 'Uric Acid', regex: /Uric\s*Acid[\s\:]*([0-9\.]+)\s*([a-zA-Z\/]+)/ }
-  ];
-  
-  // Check for each kidney test
-  kidneyTests.forEach(test => {
-    const match = text.match(test.regex);
-    if (match) {
-      testResults.push({
-        testName: test.name,
-        testDate: testDate,
-        result: match[1],
-        unit: match[2] || '',
-        normalRange: '',
-        notes: 'Extracted from uploaded file'
-      });
-    }
-  });
-  
-  // If no specific tests matched, create a general lab result
-  if (testResults.length === 0) {
-    // Extract test name (fallback)
-    const testNameMatch = text.match(/^([A-Za-z\s\(\)]+)/m);
-    const testName = testNameMatch ? testNameMatch[1].trim() : 'Lab Test';
+  // Process each line to find tests in the exact format shown in the image
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
     
+    const match = line.match(specialPattern);
+    if (match) {
+      const [_, testName, result, flag, dateInfo] = match;
+      
+      console.log(`[PARSER] Found line-based match: ${testName} = ${result} ${flag || ''} (${dateInfo})`);
+      
+      allTests.push({
+        testName: testName.trim(),
+        testDate: dateInfo.trim() || defaultDate,
+        result: result.trim(),
+        unit: '',
+        normalRange: '',
+        notes: flag ? `Extracted from uploaded file - ${flag === 'H' ? 'High' : 'Low'} (${flag})` : 'Extracted from uploaded file',
+        confidence: 'very high' // Highest confidence for line-based matches
+      });
+    }
+  }
+  
+  // Create a regexp for exact matching of common lab test abbreviations
+  const labTestPattern = new RegExp(
+    `\\b(${commonLabTests.join('|')})\\s+([0-9\\.]+|\\*{1,3})\\s*([HL])?\\s*(?:\\(([^)]+)\\))?`, 
+    'gi'
+  );
+  
+  // First, try to match common lab test abbreviations specifically
+  let matches = [...normalizedText.matchAll(labTestPattern)];
+  
+  // Process each match
+  for (const match of matches) {
+    const [fullMatch, testName, result, flag, dateInfo] = match;
+    
+    if (testName && result) {
+      // Process date information
+      let testDate = defaultDate;
+      if (dateInfo && dateInfo.trim()) {
+        testDate = dateInfo.trim();
+      }
+      
+      let notes = 'Extracted from uploaded file';
+      if (flag) {
+        notes += ` - ${flag === 'H' ? 'High' : 'Low'} (${flag})`;
+      }
+      
+      allTests.push({
+        testName: testName.trim(),
+        testDate: testDate,
+        result: result.trim(),
+        unit: '',
+        normalRange: '',
+        notes: notes,
+        confidence: 'high'  // Higher confidence for exact matches
+      });
+      
+      console.log(`[PARSER] Added test with exact match: ${testName} = ${result} ${flag || ''} (${testDate})`);
+    }
+  }
+  
+  // Add a more flexible pattern for test name and value
+  const flexibleTestPattern = /\b([A-Za-z][A-Za-z0-9\-\.]{0,9})[:\s]+([\d\.]+|\*+)/g;
+  matches = [...normalizedText.matchAll(flexibleTestPattern)];
+  
+  // Process each match - focus on shorter test names that might be abbreviated lab values
+  const processedTests = new Set(allTests.map(t => t.testName.toUpperCase()));
+  
+  for (const match of matches) {
+    const [fullMatch, testName, result] = match;
+    
+    if (testName && result && testName.length <= 5) {
+      // Skip if this is a test we already captured or if it's a likely false positive
+      if (processedTests.has(testName.toUpperCase()) || /^[0-9]/.test(testName) || testName.length < 1) {
+        continue;
+      }
+      
+      allTests.push({
+        testName: testName.trim(),
+        testDate: defaultDate,
+        result: result.trim(),
+        unit: '',
+        normalRange: '',
+        notes: 'Extracted from uploaded file',
+        confidence: 'medium' // Medium confidence for flexible matches
+      });
+      
+      console.log(`[PARSER] Added test with flexible match: ${testName} = ${result}`);
+      processedTests.add(testName.toUpperCase());
+    }
+  }
+  
+  // Fallback pattern for other tests that might not be in our list
+  const genericTestPattern = /\b([A-Za-z][A-Za-z0-9\-\.]{1,9})\s+([\d\.]+|\*+)\s*([HL])?\s*(?:\(([^)]*)\))?/g;
+  
+  // Skip tests we've already processed to avoid duplicates
+  matches = [...normalizedText.matchAll(genericTestPattern)];
+  for (const match of matches) {
+    const [fullMatch, testName, result, flag, dateInfo] = match;
+    
+    if (testName && result) {
+      // Skip if this is a test we already captured in the first pass
+      // or if it's a likely false positive
+      if (processedTests.has(testName.toUpperCase()) || /^[0-9]/.test(testName) || testName.length < 2) {
+        continue;
+      }
+      
+      // Process date information
+      let testDate = defaultDate;
+      if (dateInfo && dateInfo.trim()) {
+        testDate = dateInfo.trim();
+      }
+      
+      let notes = 'Extracted from uploaded file';
+      if (flag) {
+        notes += ` - ${flag === 'H' ? 'High' : 'Low'} (${flag})`;
+      }
+      
+      allTests.push({
+        testName: testName.trim(),
+        testDate: testDate,
+        result: result.trim(),
+        unit: '',
+        normalRange: '',
+        notes: notes,
+        confidence: 'medium' // Medium confidence for generic matches
+      });
+      
+      console.log(`[PARSER] Added test with generic match: ${testName} = ${result} ${flag || ''} (${testDate})`);
+      processedTests.add(testName.toUpperCase());
+    }
+  }
+  
+  // Return all found tests, sorted by confidence
+  testResults.push(...allTests.sort((a, b) => {
+    // First sort by confidence
+    if (a.confidence === 'very high' && b.confidence !== 'very high') return -1;
+    if (a.confidence !== 'very high' && b.confidence === 'very high') return 1;
+    if (a.confidence === 'high' && b.confidence !== 'high') return -1;
+    if (a.confidence !== 'high' && b.confidence === 'high') return 1;
+    
+    // Then sort by test name length (shorter test names first as they're more likely lab values)
+    return a.testName.length - b.testName.length;
+  }));
+  
+  // Fallback - create a generic entry if no tests found
+  if (testResults.length === 0 && text.trim().length > 0) {
+    console.log('[PARSER] No specific tests matched. Creating a fallback entry.');
     testResults.push({
-      testName: testName,
-      testDate: testDate,
+      testName: 'Laboratory Data',
+      testDate: defaultDate,
       result: '',
       unit: '',
       normalRange: '',
-      notes: 'Please review and enter test results manually. Extraction was incomplete.',
+      notes: 'Could not parse specific tests. Please review and enter manually.',
+      extractedText: text.substring(0, 500)
     });
+  } else {
+    console.log(`[PARSER] Total tests parsed: ${testResults.length}`);
   }
   
-  return testResults;
+  // Convert results to the format expected by the client
+  const clientResults = testResults.map(result => ({
+    testName: result.testName,
+    value: result.result,
+    unit: result.unit,
+    normalRange: result.normalRange,
+    date: result.testDate,
+    labName: 'Extracted from file'
+  }));
+  
+  return clientResults;
 }
 
 // Simple metadata extraction based on filename and file type for fallback
@@ -253,165 +383,272 @@ function extractBasicMetadata(filename: string, fileType: string) {
   };
 }
 
-export async function POST(req: NextRequest) {
-  let uploadDir = '';
-  let processingStage = 'initializing';
-  
+export async function POST(request: NextRequest) {
   try {
-    console.log('[LAB_UPLOAD] Starting upload processing');
-    processingStage = 'environment_detection';
+    console.log('[SERVER] Laboratory upload request received');
     
-    // Check if we're in a serverless environment
-    const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || 
-                        process.env.NETLIFY || 
-                        process.env.VERCEL || 
-                        process.cwd().includes('/var/task');
-    
-    console.log(`[LAB_UPLOAD] Environment detection: Serverless=${isServerless}, CWD=${process.cwd()}`);
-    
-    // Choose approach based on environment
-    const useAdvancedProcessing = !isServerless;
-    console.log(`[LAB_UPLOAD] Using advanced processing: ${useAdvancedProcessing}`);
-    
-    processingStage = 'creating_directories';
-    
-    // Set upload directory based on environment
-    if (isServerless) {
-      uploadDir = '/tmp';
-    } else {
-      // For local development, use paths relative to CWD
-      const cwd = process.cwd();
-      const tmpDir = join(cwd, 'tmp');
-      
-      // Ensure tmp directory exists
-      const fs = await import('fs');
-      if (!fs.existsSync(tmpDir)) {
-        await mkdir(tmpDir, { recursive: true });
-      }
-      
-      uploadDir = join(tmpDir, 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        await mkdir(uploadDir, { recursive: true });
-      }
-    }
-    
-    console.log(`[LAB_UPLOAD] Using upload directory: ${uploadDir}`);
-    
-    processingStage = 'auth_check';
+    // Verify authentication
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
+      console.log('[SERVER] Authentication failed');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get form data
-    processingStage = 'form_data_extraction';
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
+    const userEmail = session.user.email;
+    
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+    });
+
+    if (!user) {
+      console.log('[SERVER] User not found:', userEmail);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    console.log('[SERVER] Processing upload for user:', userEmail);
+    
+    // Get data from the form
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    
+    // Get metadata from form
+    const testName = formData.get('testName') as string || '';
+    const testValue = formData.get('testValue') as string || '';
+    const testUnit = formData.get('testUnit') as string || '';
+    const referenceRange = formData.get('referenceRange') as string || '';
     
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      console.log('[SERVER] No file in request');
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
     
-    console.log(`[LAB_UPLOAD] File received: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
+    console.log(`[SERVER] File received: ${file.name}, type: ${file.type}, size: ${file.size} bytes`);
     
-    let extractedData;
-    let extractedText = '';
+    // Simple validation
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+      console.log('[SERVER] Invalid file type:', file.type);
+      return NextResponse.json({ 
+        error: 'Invalid file type', 
+        stage: 'validation',
+        details: `Only PDF, JPG, and PNG files are supported. Received: ${file.type}`
+      }, { status: 400 });
+    }
     
-    if (useAdvancedProcessing) {
-      // Advanced processing for local environment
-      processingStage = 'file_saving';
-      const filename = `${uuidv4()}-${file.name}`;
-      const filePath = join(uploadDir, filename);
-      console.log(`[LAB_UPLOAD] Saving file to: ${filePath}`);
+    // Create upload directory
+    const baseUploadDir = getBaseUploadDir();
+    const userUploadDir = join(baseUploadDir, user.id);
+    
+    try {
+      console.log(`[SERVER] Creating upload directory: ${userUploadDir}`);
+      await mkdir(userUploadDir, { recursive: true });
+    } catch (e) {
+      console.error('[SERVER] Failed to create upload directory:', e);
+      return NextResponse.json({ 
+        error: 'Failed to create upload directory', 
+        stage: 'directory_creation',
+        details: e instanceof Error ? e.message : String(e)
+      }, { status: 500 });
+    }
+    
+    // Save file
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const timestamp = Date.now();
+    const filename = `lab_result_${timestamp}.${fileExtension}`;
+    const filepath = join(userUploadDir, filename);
+    
+    try {
+      console.log(`[SERVER] Saving file to: ${filepath}`);
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await writeFile(filepath, buffer);
+      console.log('[SERVER] File saved successfully');
+    } catch (e) {
+      console.error('[SERVER] Failed to save file:', e);
+      return NextResponse.json({ 
+        error: 'Failed to save file', 
+        stage: 'file_saving',
+        details: e instanceof Error ? e.message : String(e)
+      }, { status: 500 });
+    }
+    
+    // If we're on Netlify or using client-side extraction, skip the OCR
+    if (isNetlify) {
+      console.log('[SERVER] Running in serverless environment, skipping OCR processing');
       
-      // Convert file to buffer and save to disk
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      await writeFile(filePath, buffer);
-      console.log(`[LAB_UPLOAD] File saved successfully to: ${filePath}`);
-      
-      // Check if file was actually saved
-      const fs = await import('fs');
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`File was not saved at ${filePath}`);
+      // Save to database with the provided metadata
+      try {
+        const labResult = await prisma.laboratoryData.create({
+          data: {
+            userId: user.id,
+            testName: testName || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+            result: testValue,
+            unit: testUnit,
+            normalRange: referenceRange,
+            testDate: new Date(),
+            notes: 'Uploaded from file'
+          },
+        });
+        
+        console.log('[SERVER] Lab result saved to database:', labResult.id);
+        
+        return NextResponse.json({
+          success: true,
+          message: 'تست آزمایشگاهی با موفقیت ذخیره شد',
+          resultId: labResult.id
+        });
+      } catch (e) {
+        console.error('[SERVER] Database error:', e);
+        return NextResponse.json({ 
+          error: 'Failed to save to database', 
+          stage: 'database',
+          details: e instanceof Error ? e.message : String(e)
+        }, { status: 500 });
       }
+    }
+    
+    // If we're in local development, we can do full processing
+    if (isLocalDev) {
+      console.log('[SERVER] Processing file with OCR (local development mode)');
       
       try {
-        // Extract text based on file type
-        processingStage = 'text_extraction';
-        console.log(`[LAB_UPLOAD] Processing file of type: ${file.type}`);
+        let extractedText = '';
         
+        // Process file based on type
         if (file.type === 'application/pdf') {
-          console.log('[LAB_UPLOAD] Starting PDF extraction');
-          extractedText = await extractTextFromPDF(filePath);
-          console.log('[LAB_UPLOAD] PDF extraction completed');
-        } else if (file.type.startsWith('image/')) {
-          console.log('[LAB_UPLOAD] Starting OCR extraction');
-          extractedText = await extractTextFromImage(filePath);
-          console.log('[LAB_UPLOAD] OCR extraction completed');
+          console.log('[SERVER] Processing PDF file');
+          const buffer = await readFile(filepath);
+          const pdfData = await PDFParser(buffer);
+          extractedText = pdfData.text;
+          console.log('[SERVER] PDF text extracted:', extractedText.substring(0, 100) + '...');
         } else {
-          console.log('[LAB_UPLOAD] Unsupported file type, using basic extraction');
-          extractedData = extractBasicMetadata(file.name, file.type);
-          return NextResponse.json({
-            success: true,
-            extractedText: '',
-            extractedData,
+          // Image file
+          console.log('[SERVER] Processing image file with Tesseract');
+          
+          const worker = await createTesseractWorker('fas', (message) => {
+            if (message.status === 'recognizing text') {
+              console.log(`[SERVER] OCR progress: ${Math.floor(message.progress * 100)}%`);
+            } else {
+              console.log(`[SERVER] OCR status: ${message.status}`);
+            }
           });
+          
+          const buffer = await readFile(filepath);
+          const result = await worker.recognize(buffer);
+          extractedText = result.data.text;
+          console.log('[SERVER] Image text extracted:', extractedText.substring(0, 100) + '...');
+          
+          await worker.terminate();
         }
         
         // Parse the extracted text to structured data
-        processingStage = 'data_parsing';
-        console.log('[LAB_UPLOAD] Parsing extracted text');
-        extractedData = parseLabResults(extractedText);
-        console.log('[LAB_UPLOAD] Parsing complete');
+        console.log('[SERVER] Parsing extracted text');
+        const parsedResults = parseLabResults(extractedText);
+        console.log('[SERVER] Got parsed results:', parsedResults ? parsedResults.length : 0);
         
-        // Clean up the uploaded file
-        try {
-          await fs.promises.unlink(filePath);
-          console.log(`[LAB_UPLOAD] Temporary file removed: ${filePath}`);
-        } catch (cleanupError) {
-          console.warn(`[LAB_UPLOAD] Failed to remove temporary file: ${filePath}`, cleanupError);
+        // Use defaults if still empty
+        let finalTestName = testName || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        let finalTestValue = testValue || '';
+        let finalTestUnit = testUnit || '';
+        let finalReferenceRange = referenceRange || '';
+        
+        // Check if we have multiple results from text extraction
+        if (Array.isArray(parsedResults) && parsedResults.length > 0) {
+          console.log('[SERVER] Creating multiple lab results from parsed data');
+          
+          // Generate a unique file ID for grouping
+          const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Create a lab result for each extracted entity
+          const labResults = [];
+          for (const entry of parsedResults) {
+            if (entry && entry.testName && entry.value) {
+              try {
+                // Convert the date string to a Date object if needed
+                const testDate = entry.date ? new Date(entry.date) : new Date();
+                
+                const labResult = await prisma.laboratoryData.create({
+                  data: {
+                    userId: user.id,
+                    testName: entry.testName,
+                    testDate: testDate,
+                    result: entry.value,
+                    unit: entry.unit || '',
+                    normalRange: entry.normalRange || '',
+                    notes: `Extracted from file. fileId:${fileId}`
+                  },
+                });
+                
+                labResults.push(labResult);
+                console.log('[SERVER] Created lab result:', labResult.id);
+              } catch (err) {
+                console.error('[SERVER] Error creating lab result for', entry.testName, err);
+              }
+            }
+          }
+          
+          return NextResponse.json({
+            success: true,
+            message: `${labResults.length} نتیجه آزمایشگاهی با موفقیت ذخیره شد`,
+            resultIds: labResults.map(r => r.id),
+            extractedData: parsedResults
+          });
+        } else {
+          // If no multiple results, create a single lab result (backward compatibility)
+          console.log('[SERVER] Creating single lab result');
+          
+          // Try to parse important fields if we have extracted text
+          // ... (existing parsing logic for single result)
+          
+          const labResult = await prisma.laboratoryData.create({
+            data: {
+              userId: user.id,
+              testName: finalTestName,
+              testDate: new Date(),
+              result: finalTestValue,
+              unit: finalTestUnit,
+              normalRange: finalReferenceRange,
+              notes: 'Extracted from file'
+            },
+          });
+          
+          console.log('[SERVER] Lab result saved to database:', labResult.id);
+          
+          return NextResponse.json({
+            success: true,
+            message: 'تست آزمایشگاهی با موفقیت ذخیره شد',
+            resultId: labResult.id,
+            extractedData: {
+              testName: finalTestName,
+              value: finalTestValue,
+              unit: finalTestUnit,
+              normalRange: finalReferenceRange
+            }
+          });
         }
-      } catch (processingError) {
-        console.error('[LAB_UPLOAD] Error in advanced processing, falling back to basic extraction:', processingError);
-        extractedData = extractBasicMetadata(file.name, file.type);
-        extractedText = '';
+      } catch (e) {
+        console.error('[SERVER] Error processing file:', e);
+        return NextResponse.json({ 
+          error: 'Error processing lab result file', 
+          stage: 'processing',
+          details: e instanceof Error ? e.message : String(e)
+        }, { status: 500 });
       }
-    } else {
-      // Simple processing for serverless environment
-      processingStage = 'metadata_extraction';
-      extractedData = extractBasicMetadata(file.name, file.type);
-      console.log('[LAB_UPLOAD] Metadata extraction complete');
     }
     
-    return NextResponse.json({
-      success: true,
-      extractedText,
-      extractedData,
-    });
+    // This should not happen, but just in case
+    return NextResponse.json({ 
+      error: 'Unknown environment configuration', 
+      stage: 'environment',
+      details: 'The server could not determine whether to process the file locally or in the cloud'
+    }, { status: 500 });
+    
   } catch (error) {
-    console.error(`[LAB_UPLOAD] Error in stage "${processingStage}":`, error);
-    
-    // Try to get a sample of the extracted text if available
-    let errorDetails = '';
-    if (error instanceof Error) {
-      errorDetails = error.message;
-      if (error.stack) {
-        console.error('[LAB_UPLOAD] Error stack:', error.stack);
-      }
-    }
-    
-    return NextResponse.json(
-      { 
-        error: 'Error processing lab result file',
-        stage: processingStage,
-        details: errorDetails,
-        path: uploadDir || '/tmp',
-        cwd: process.cwd(),
-        env: process.env.NODE_ENV,
-        serverless: process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY || process.env.VERCEL || false
-      },
-      { status: 500 }
-    );
+    console.error('[SERVER] Unhandled error in upload route:', error);
+    return NextResponse.json({ 
+      error: 'An unexpected error occurred', 
+      stage: 'unknown',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
-} 
+}

@@ -11,8 +11,17 @@ import { useRouter } from 'next/navigation';
 export default function MobileMenu({ onQuestionClick }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isQuestionsOpen, setIsQuestionsOpen] = useState(false);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
+  
+  // Debug session in mobile menu
+  useEffect(() => {
+    console.log("Session in MobileMenu:", session);
+    console.log("Session status in MobileMenu:", status);
+  }, [session, status]);
+  
+  // Check if the user is authenticated
+  const isAuthenticated = status === 'authenticated' && session !== null;
   
   // Frequent questions data
   const frequentQuestions = [
@@ -166,7 +175,7 @@ export default function MobileMenu({ onQuestionClick }) {
               صفحه اصلی
             </Link>
             
-            {session && (
+            {isAuthenticated && (
               <>
                 <Link href="/profile" className={styles.navLink} onClick={toggleMenu}>
                   پروفایل پزشکی

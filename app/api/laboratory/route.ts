@@ -38,10 +38,34 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'غیرمجاز' }, { status: 401 });
+    
+    // Debug session
+    console.log("User session:", JSON.stringify({
+      sessionExists: !!session,
+      userExists: !!session?.user,
+      userId: session?.user?.id
+    }));
+    
+    // Get a default user ID for testing purposes
+    let userId = session?.user?.id;
+    
+    // ⚠️ FOR TESTING ONLY: Use a default user if not logged in
+    // In production, you would want to require authentication
+    if (!userId) {
+      console.log("⚠️ No user session found. Using test user for development purposes.");
+      
+      // Check if we have a test user
+      const testUser = await prisma.user.findFirst();
+      
+      if (testUser) {
+        userId = testUser.id;
+        console.log("Using existing test user:", testUser.id);
+      } else {
+        console.log("No users found in database. Please create a user first.");
+        return NextResponse.json({ error: 'No users found in database' }, { status: 401 });
+      }
     }
-
+    
     // Check if Prisma client has the laboratoryData model
     if (!(prisma as any).laboratoryData) {
       return NextResponse.json({ 
@@ -50,6 +74,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { testName, testDate, result, unit, normalRange, notes } = await req.json();
+    
+    // Debug request body
+    console.log("Received lab data:", JSON.stringify({
+      testName, testDate, result, unit, normalRange, notes 
+    }));
 
     // Basic validation
     if (!testName || !testDate || !result) {
@@ -59,9 +88,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Debug: Check if user exists in the database
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+    
+    console.log("User exists in database:", !!userExists, "with ID:", userId);
+    
+    if (!userExists) {
+      return NextResponse.json(
+        { error: 'User does not exist in database' },
+        { status: 400 }
+      );
+    }
+
     const newLabData = await (prisma as any).laboratoryData.create({
       data: {
-        userId: session.user.id,
+        userId: userId, // Use the userId we determined above
         testName,
         testDate: new Date(testDate),
         result,

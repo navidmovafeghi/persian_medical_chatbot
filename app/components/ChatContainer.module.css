@@ -1,13 +1,11 @@
 /* app/components/ChatContainer.module.css */
 .chatContainer {
-  flex-grow: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  padding: 24px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-color) transparent;
-  font-family: 'Kalameh', 'Vazir', 'Tahoma', sans-serif;
+  gap: 1rem;
 }
 
 .chatContainer::-webkit-scrollbar {
@@ -24,73 +22,54 @@
 }
 
 .message {
-  margin-bottom: 20px;
-  max-width: 85%;
-  animation: fadeIn 0.5s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  padding: 1rem;
+  border-radius: 12px;
+  max-width: 80%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
 }
 
 .userMessage {
-  align-self: flex-end;
-  padding: 12px 18px;
-  background-color: var(--primary);
-  color: white;
-  border-radius: 18px 18px 0 18px;
-  position: relative;
-  margin-left: auto; /* Right-align user messages */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  align-self: flex-start;
+  background-color: #f0f0f0;
+  color: #333;
 }
 
 .botMessage {
-  align-self: flex-start;
-  padding: 12px 18px;
-  background-color: var(--background);
-  color: var(--foreground);
-  border-radius: 18px 18px 18px 0;
-  position: relative;
-  margin-right: auto; /* Left-align bot messages */
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color);
+  align-self: flex-end;
+  background-color: #2563eb;
+  color: white;
 }
 
-.emptyState {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: var(--foreground);
-  opacity: 0.7;
-  text-align: center;
-  padding: 24px;
+/* Add styling for lab result messages */
+.labResultsMessage {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border: 1px solid #90caf9;
+  font-weight: 500;
 }
 
-.emptyState h2 {
-  font-size: 1.5rem;
-  margin-bottom: 16px;
+.labResultsMessage a {
+  color: #0d47a1;
+  text-decoration: underline;
+  font-weight: bold;
+  display: inline-block;
+  margin-top: 0.75rem;
+  background-color: #bbdefb;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
-.emptyState p {
-  font-size: 1rem;
-  max-width: 400px;
-  line-height: 1.6;
+.labResultsMessage a:hover {
+  background-color: #90caf9;
 }
 
-.emptyStateIcon {
-  font-size: 48px;
-  margin-bottom: 20px;
-  color: var(--primary);
-  opacity: 0.7;
-}
-
-/* Loading animation */
 .loadingDots {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  gap: 0.3rem;
+  justify-content: center;
 }
 
 .dot {
@@ -98,10 +77,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: currentColor;
-  opacity: 0.7;
-  margin: 0 3px;
-  animation: dot-pulse 1.5s infinite ease-in-out;
+  background-color: rgba(255, 255, 255, 0.7);
+  animation: pulse 1s infinite;
 }
 
 .dot:nth-child(2) {
@@ -112,15 +89,75 @@
   animation-delay: 0.4s;
 }
 
-@keyframes dot-pulse {
+@keyframes pulse {
   0%, 100% {
-    transform: scale(0.7);
-    opacity: 0.5;
+    transform: scale(1);
+    opacity: 0.7;
   }
   50% {
-    transform: scale(1);
+    transform: scale(1.2);
     opacity: 1;
   }
+}
+
+.emptyState {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+}
+
+.emptyStateIcon {
+  font-size: 3rem;
+}
+
+.emptyState h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.emptyState p {
+  color: #666;
+  margin: 0;
+}
+
+/* Lab result action buttons */
+.labResultsMessage :global(.lab-result-actions) {
+  margin-top: 1rem;
+  display: flex;
+  gap: 10px;
+}
+
+.labResultsMessage :global(.action-button) {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.labResultsMessage :global(.save-results) {
+  background-color: #4caf50;
+  color: white;
+}
+
+.labResultsMessage :global(.save-results:hover) {
+  background-color: #388e3c;
+}
+
+.labResultsMessage :global(.discard-results) {
+  background-color: #f44336;
+  color: white;
+}
+
+.labResultsMessage :global(.discard-results:hover) {
+  background-color: #d32f2f;
 }
 
 /* Responsive styles */

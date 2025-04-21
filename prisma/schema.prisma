@@ -93,6 +93,7 @@ model ChatMessage {
   userId    String?  // Optional: can be null for anonymous users
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversationId String  // To group messages into conversations
+  metadata   String?  // JSON string for additional data like lab results
   createdAt DateTime @default(now())
   
   @@index([userId])
