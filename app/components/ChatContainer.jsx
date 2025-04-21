@@ -61,6 +61,32 @@ export default function ChatContainer({ messages, isLoading, onLabResultAction }
     if (message.text.includes('<a href=')) {
       return <div dangerouslySetInnerHTML={{ __html: message.text }} />;
     }
+
+    // For pill reminder messages
+    if (message.text.includes('یادآور داروی شما با موفقیت ثبت شد')) {
+      return (
+        <div>
+          <div className={styles.pillReminderIndicator}>
+            <span className={styles.pillIcon}>💊</span>
+            <span className={styles.pillReminderSuccess}>یادآور دارو ثبت شد</span>
+          </div>
+          <div>{message.text}</div>
+        </div>
+      );
+    }
+    
+    // For failed pill reminder messages
+    if (message.text.includes('یادآور دارویی برای') && message.text.includes('ایجاد کنید') && message.sender === 'bot') {
+      return (
+        <div>
+          <div className={styles.pillReminderIndicator}>
+            <span className={styles.pillIcon}>💊</span>
+            <span className={styles.pillReminderError}>خطا در ثبت یادآور</span>
+          </div>
+          <div>{message.text}</div>
+        </div>
+      );
+    }
     
     // Regular text messages
     return message.text;
@@ -91,12 +117,17 @@ export default function ChatContainer({ messages, isLoading, onLabResultAction }
           const isLabResults = message.id?.startsWith('lab_results_') || 
                               message.text.includes('data-action="save-lab-results"');
           
+          // Check if this is a pill reminder message
+          const isPillReminder = message.sender === 'bot' && 
+                               (message.text.includes('یادآور داروی شما با موفقیت ثبت شد') || 
+                                message.text.includes('یادآور دارویی برای'));
+          
           return (
             <div
               key={message.id || index}
               className={`${styles.message} ${
                 message.sender === 'user' ? styles.userMessage : styles.botMessage
-              } ${isLabResults ? styles.labResultsMessage : ''}`}
+              } ${isLabResults ? styles.labResultsMessage : ''} ${isPillReminder ? styles.pillReminderMessage : ''}`}
             >
               {processMessageContent(message)}
             </div>

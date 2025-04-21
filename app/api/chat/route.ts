@@ -342,23 +342,47 @@ function detectPillReminderIntent(message: string): {
   // Keywords related to medication reminders in Persian
   const medicationKeywords = [
     'دارو', 'قرص', 'کپسول', 'شربت', 'آمپول', 'اسپری', 
-    'یادآور', 'یادآوری', 'مصرف', 'خوردن'
+    'یادآور', 'یادآوری', 'مصرف', 'خوردن', 'یادم بنداز', 'به من یادآوری کن',
+    'فراموش نکنم', 'باید مصرف کنم', 'باید بخورم', 'نسخه', 'تجویز', 'داروخانه'
   ];
+  
+  // Intent phrases that strongly indicate a pill reminder request
+  const intentPhrases = [
+    'یادآور دارو',
+    'یادم بنداز',
+    'به من یادآوری کن',
+    'فراموش نکنم دارو',
+    'باید مصرف کنم',
+    'باید بخورم',
+    'یادم بیار که',
+    'یادآور برام بذار',
+    'یادآور تنظیم کن',
+    'برام ثبت کن',
+    'برام یادداشت کن'
+  ];
+  
+  // Check for intent phrases
+  const containsIntentPhrase = intentPhrases.some(phrase => 
+    message.toLowerCase().includes(phrase.toLowerCase())
+  );
   
   // Check for medication keywords
   const containsMedicationKeywords = medicationKeywords.some(keyword => 
-    message.toLowerCase().includes(keyword)
+    message.toLowerCase().includes(keyword.toLowerCase())
   );
   
-  if (!containsMedicationKeywords) {
+  if (!containsMedicationKeywords && !containsIntentPhrase) {
     return null;
   }
   
   // Extract medication name
   let name = '';
   const namePatterns = [
-    /(?:داروی|قرص|کپسول|شربت|آمپول|اسپری)\s+([^\s,]+(?:\s+[^\s,]+)?)/i,
-    /([^\s,]+(?:\s+[^\s,]+)?)\s+(?:را مصرف می‌کنم|می‌خورم)/i
+    /(?:داروی|قرص|کپسول|شربت|آمپول|اسپری)\s+([^\s,]+(?:\s+[^\s,]+){0,2})/i,
+    /([^\s,]+(?:\s+[^\s,]+){0,2})\s+(?:را مصرف می‌کنم|می‌خورم|باید بخورم|باید مصرف کنم)/i,
+    /داروی\s+([^\s,.;:]+)/i,
+    /قرص\s+([^\s,.;:]+)/i,
+    /مصرف\s+([^\s,.;:]+)/i
   ];
   
   for (const pattern of namePatterns) {
@@ -390,7 +414,8 @@ function detectPillReminderIntent(message: string): {
   let dosage = '1 عدد';
   const dosagePatterns = [
     /(\d+(?:\.\d+)?)\s+(?:عدد|میلی‌گرم|گرم|سی‌سی|واحد|قطره|میلی‌لیتر|قاشق)/i,
-    /(\d+(?:\.\d+)?)\s+(?:mg|g|ml|cc|mcg|µg)/i
+    /(\d+(?:\.\d+)?)\s+(?:mg|g|ml|cc|mcg|µg)/i,
+    /هر بار\s+(\d+(?:\.\d+)?)\s+(?:عدد|میلی‌گرم|گرم)/i
   ];
   
   for (const pattern of dosagePatterns) {
@@ -403,36 +428,36 @@ function detectPillReminderIntent(message: string): {
   
   // Extract frequency
   let frequency = 'daily';
-  if (message.includes('روزانه') || message.includes('هر روز')) {
+  if (message.includes('روزانه') || message.includes('هر روز') || message.includes('یک بار در روز')) {
     frequency = 'daily';
-  } else if (message.includes('دو بار در روز') || message.includes('روزی دو بار')) {
+  } else if (message.includes('دو بار در روز') || message.includes('روزی دو بار') || message.includes('صبح و شب')) {
     frequency = 'twice_daily';
-  } else if (message.includes('سه بار در روز') || message.includes('روزی سه بار')) {
+  } else if (message.includes('سه بار در روز') || message.includes('روزی سه بار') || message.includes('صبح و ظهر و شب')) {
     frequency = 'three_times_daily';
-  } else if (message.includes('هفتگی') || message.includes('هر هفته')) {
+  } else if (message.includes('هفتگی') || message.includes('هر هفته') || message.includes('یک بار در هفته')) {
     frequency = 'weekly';
-  } else if (message.includes('ماهانه') || message.includes('هر ماه')) {
+  } else if (message.includes('ماهانه') || message.includes('هر ماه') || message.includes('یک بار در ماه')) {
     frequency = 'monthly';
-  } else if (message.includes('در صورت نیاز') || message.includes('موقع نیاز')) {
+  } else if (message.includes('در صورت نیاز') || message.includes('موقع نیاز') || message.includes('به هنگام درد')) {
     frequency = 'as_needed';
   }
   
   // Extract times
   let times: string[] = ['08:00'];
-  if (message.includes('صبح')) {
+  if (message.includes('صبح') && !message.includes('ظهر') && !message.includes('شب')) {
     times = ['08:00'];
-  } else if (message.includes('ظهر')) {
-    times = ['13:00'];
-  } else if (message.includes('شب')) {
+  } else if (!message.includes('صبح') && !message.includes('ظهر') && message.includes('شب')) {
     times = ['20:00'];
-  } else if (message.includes('صبح و شب') || message.includes('دو بار در روز')) {
+  } else if (message.includes('ظهر') && !message.includes('صبح') && !message.includes('شب')) {
+    times = ['13:00'];
+  } else if (message.includes('صبح') && message.includes('شب') && !message.includes('ظهر')) {
     times = ['08:00', '20:00'];
-  } else if (message.includes('صبح و ظهر و شب') || message.includes('سه بار در روز')) {
+  } else if (message.includes('صبح') && message.includes('ظهر') && message.includes('شب')) {
     times = ['08:00', '13:00', '20:00'];
   }
   
   // Extract specific times
-  const timePattern = /ساعت\s?(\d{1,2})(?::(\d{2}))?/gi;
+  const timePattern = /(?:ساعت|زمان)\s*(?:های)?\s*(?:مصرف)?\s*:?\s*(\d{1,2})(?::(\d{2}))?/gi;
   let timeMatch;
   const specificTimes: string[] = [];
   
@@ -455,14 +480,18 @@ function detectPillReminderIntent(message: string): {
   const withFood = message.includes('با غذا') || 
                    message.includes('همراه غذا') || 
                    message.includes('بعد از غذا') ||
-                   message.includes('پس از غذا');
+                   message.includes('پس از غذا') ||
+                   message.includes('با وعده غذایی') ||
+                   message.includes('بعد از صبحانه') || 
+                   message.includes('بعد از ناهار') || 
+                   message.includes('بعد از شام');
   
   // Extract start date (default to today)
   const startDate = new Date();
   
   // Extract notes
   let notes = undefined;
-  const notesMatch = message.match(/(?:توضیحات|یادداشت):\s*([^\n]+)/i);
+  const notesMatch = message.match(/(?:توضیحات|یادداشت|نکته):\s*([^\n]+)/i);
   if (notesMatch && notesMatch[1]) {
     notes = notesMatch[1].trim();
   }
