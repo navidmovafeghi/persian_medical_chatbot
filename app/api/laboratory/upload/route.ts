@@ -7,14 +7,12 @@ import { mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import { existsSync } from 'fs';
-import { tesseractWorkerOptions, createTesseractWorker } from '../../../../tesseract-preload';
 import { PrismaClient } from '@prisma/client';
 import PDFParser from 'pdf-parse';
 
 const prisma = new PrismaClient();
 
 // Conditional imports for local development
-let Tesseract: any;
 let pdfjsLib: any;
 
 const isNetlify = process.env.NETLIFY === 'true';
@@ -24,76 +22,6 @@ const isLocalDev = process.env.NODE_ENV === 'development';
 const getBaseUploadDir = () => {
   return isNetlify ? '/tmp/uploads' : join(process.cwd(), 'uploads');
 };
-
-// Function to extract text from images using Tesseract.js (OCR)
-async function extractTextFromImage(filePath: string): Promise<string> {
-  try {
-    console.log(`[OCR] Starting OCR on image: ${filePath}`);
-    
-    if (!Tesseract) {
-      console.log('[OCR] Loading Tesseract.js dynamically');
-      Tesseract = await import('tesseract.js');
-    }
-    
-    if (!filePath || typeof filePath !== 'string') {
-      throw new Error(`Invalid file path for OCR: ${filePath}`);
-    }
-    
-    // Check if file exists
-    const fs = await import('fs');
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File does not exist for OCR: ${filePath}`);
-    }
-    
-    console.log(`[OCR] File verified, starting Tesseract recognition`);
-    
-    // Use worker with CDN path to avoid path resolving issues
-    const { createWorker } = Tesseract;
-    const worker = await createWorker({
-      // Use a CDN path for the worker
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
-      logger: (m: any) => {
-        if (m.status === 'recognizing text') {
-          console.log(`[OCR] Recognition progress: ${Math.floor(m.progress * 100)}%`);
-        } else {
-          console.log(`[OCR] Status: ${m.status}`);
-        }
-      }
-    });
-    
-    // Initialize worker with correct languages
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    console.log('[OCR] Worker initialized with English language');
-    
-    // Recognize the image
-    const { data } = await worker.recognize(filePath);
-    const text = data.text;
-    
-    // Terminate the worker
-    await worker.terminate();
-    
-    // Log a sample of the extracted text (first 200 chars)
-    const textSample = text.substring(0, 200).replace(/\n/g, ' ');
-    console.log(`[OCR] Extraction complete. Text sample: "${textSample}..."`);
-    console.log(`[OCR] Total text length: ${text.length} characters`);
-    
-    // Log the first 20 lines for debugging
-    const lines = text.split('\n');
-    console.log(`[OCR] Extracted ${lines.length} lines of text`);
-    for (let i = 0; i < Math.min(20, lines.length); i++) {
-      const line = lines[i].trim();
-      if (line) {
-        console.log(`[OCR] Line ${i}: "${line}"`);
-      }
-    }
-    
-    return text;
-  } catch (error) {
-    console.error('[OCR] Error in OCR processing:', error);
-    throw new Error(`Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
 
 // Function to parse PDF
 async function extractTextFromPDF(filePath: string): Promise<string> {
@@ -471,176 +399,35 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // If we're on Netlify or using client-side extraction, skip the OCR
-    if (isNetlify) {
-      console.log('[SERVER] Running in serverless environment, skipping OCR processing');
+    // Save to database with the provided metadata
+    try {
+      const labResult = await prisma.laboratoryData.create({
+        data: {
+          userId: user.id,
+          testName: testName || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+          result: testValue,
+          unit: testUnit,
+          normalRange: referenceRange,
+          testDate: new Date(),
+          notes: 'Uploaded from file'
+        },
+      });
       
-      // Save to database with the provided metadata
-      try {
-        const labResult = await prisma.laboratoryData.create({
-          data: {
-            userId: user.id,
-            testName: testName || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-            result: testValue,
-            unit: testUnit,
-            normalRange: referenceRange,
-            testDate: new Date(),
-            notes: 'Uploaded from file'
-          },
-        });
-        
-        console.log('[SERVER] Lab result saved to database:', labResult.id);
-        
-        return NextResponse.json({
-          success: true,
-          message: 'تست آزمایشگاهی با موفقیت ذخیره شد',
-          resultId: labResult.id
-        });
-      } catch (e) {
-        console.error('[SERVER] Database error:', e);
-        return NextResponse.json({ 
-          error: 'Failed to save to database', 
-          stage: 'database',
-          details: e instanceof Error ? e.message : String(e)
-        }, { status: 500 });
-      }
-    }
-    
-    // If we're in local development, we can do full processing
-    if (isLocalDev) {
-      console.log('[SERVER] Processing file with OCR (local development mode)');
+      console.log('[SERVER] Lab result saved to database:', labResult.id);
       
-      try {
-        let extractedText = '';
-        
-        // Process file based on type
-        if (file.type === 'application/pdf') {
-          console.log('[SERVER] Processing PDF file');
-          const buffer = await readFile(filepath);
-          const pdfData = await PDFParser(buffer);
-          extractedText = pdfData.text;
-          console.log('[SERVER] PDF text extracted:', extractedText.substring(0, 100) + '...');
-        } else {
-          // Image file
-          console.log('[SERVER] Processing image file with Tesseract');
-          
-          const worker = await createTesseractWorker('fas', (message) => {
-            if (message.status === 'recognizing text') {
-              console.log(`[SERVER] OCR progress: ${Math.floor(message.progress * 100)}%`);
-            } else {
-              console.log(`[SERVER] OCR status: ${message.status}`);
-            }
-          });
-          
-          const buffer = await readFile(filepath);
-          const result = await worker.recognize(buffer);
-          extractedText = result.data.text;
-          console.log('[SERVER] Image text extracted:', extractedText.substring(0, 100) + '...');
-          
-          await worker.terminate();
-        }
-        
-        // Parse the extracted text to structured data
-        console.log('[SERVER] Parsing extracted text');
-        const parsedResults = parseLabResults(extractedText);
-        console.log('[SERVER] Got parsed results:', parsedResults ? parsedResults.length : 0);
-        
-        // Use defaults if still empty
-        let finalTestName = testName || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-        let finalTestValue = testValue || '';
-        let finalTestUnit = testUnit || '';
-        let finalReferenceRange = referenceRange || '';
-        
-        // Check if we have multiple results from text extraction
-        if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-          console.log('[SERVER] Creating multiple lab results from parsed data');
-          
-          // Generate a unique file ID for grouping
-          const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
-          // Create a lab result for each extracted entity
-          const labResults = [];
-          for (const entry of parsedResults) {
-            if (entry && entry.testName && entry.value) {
-              try {
-                // Convert the date string to a Date object if needed
-                const testDate = entry.date ? new Date(entry.date) : new Date();
-                
-                const labResult = await prisma.laboratoryData.create({
-                  data: {
-                    userId: user.id,
-                    testName: entry.testName,
-                    testDate: testDate,
-                    result: entry.value,
-                    unit: entry.unit || '',
-                    normalRange: entry.normalRange || '',
-                    notes: `Extracted from file. fileId:${fileId}`
-                  },
-                });
-                
-                labResults.push(labResult);
-                console.log('[SERVER] Created lab result:', labResult.id);
-              } catch (err) {
-                console.error('[SERVER] Error creating lab result for', entry.testName, err);
-              }
-            }
-          }
-          
-          return NextResponse.json({
-            success: true,
-            message: `${labResults.length} نتیجه آزمایشگاهی با موفقیت ذخیره شد`,
-            resultIds: labResults.map(r => r.id),
-            extractedData: parsedResults
-          });
-        } else {
-          // If no multiple results, create a single lab result (backward compatibility)
-          console.log('[SERVER] Creating single lab result');
-          
-          // Try to parse important fields if we have extracted text
-          // ... (existing parsing logic for single result)
-          
-          const labResult = await prisma.laboratoryData.create({
-            data: {
-              userId: user.id,
-              testName: finalTestName,
-              testDate: new Date(),
-              result: finalTestValue,
-              unit: finalTestUnit,
-              normalRange: finalReferenceRange,
-              notes: 'Extracted from file'
-            },
-          });
-          
-          console.log('[SERVER] Lab result saved to database:', labResult.id);
-          
-          return NextResponse.json({
-            success: true,
-            message: 'تست آزمایشگاهی با موفقیت ذخیره شد',
-            resultId: labResult.id,
-            extractedData: {
-              testName: finalTestName,
-              value: finalTestValue,
-              unit: finalTestUnit,
-              normalRange: finalReferenceRange
-            }
-          });
-        }
-      } catch (e) {
-        console.error('[SERVER] Error processing file:', e);
-        return NextResponse.json({ 
-          error: 'Error processing lab result file', 
-          stage: 'processing',
-          details: e instanceof Error ? e.message : String(e)
-        }, { status: 500 });
-      }
+      return NextResponse.json({
+        success: true,
+        message: 'تست آزمایشگاهی با موفقیت ذخیره شد',
+        resultId: labResult.id
+      });
+    } catch (e) {
+      console.error('[SERVER] Database error:', e);
+      return NextResponse.json({ 
+        error: 'Failed to save to database', 
+        stage: 'database',
+        details: e instanceof Error ? e.message : String(e)
+      }, { status: 500 });
     }
-    
-    // This should not happen, but just in case
-    return NextResponse.json({ 
-      error: 'Unknown environment configuration', 
-      stage: 'environment',
-      details: 'The server could not determine whether to process the file locally or in the cloud'
-    }, { status: 500 });
     
   } catch (error) {
     console.error('[SERVER] Unhandled error in upload route:', error);
